@@ -1,3 +1,4 @@
+#' @export
 check_api_keys <- function(fpath = NULL) {
   if (!exists("api_keys")) {
     if (is.null(fpath)) {
@@ -8,6 +9,7 @@ check_api_keys <- function(fpath = NULL) {
 }
 
 #' @import arrow
+#' @export
 create_bucket <- function(api_keys) {
   s3_bucket(
     bucket = "dtc-par",
@@ -16,7 +18,7 @@ create_bucket <- function(api_keys) {
   )
 }
 
-
+#' @export
 try_read <- function(bucket, fpath, max_iter = 10) {
   for (i in 1:max_iter) {
     x <- try(read_parquet(bucket$path(fpath)))
@@ -26,6 +28,7 @@ try_read <- function(bucket, fpath, max_iter = 10) {
   }
 }
 
+#' @export
 try_write <- function(bucket, dat, fpath, max_iter = 10) {
   for (i in 1:max_iter) {
     x <- try(write_parquet(dat, bucket$path(fpath)))
@@ -35,6 +38,77 @@ try_write <- function(bucket, dat, fpath, max_iter = 10) {
   }
 }
 
+#' @export
+read_ret_par <- function(bucket, ret_src, tgt_col = NULL, max_iter = 10) {
+  fpath <- bucket$path(paste0("returns/", ret_src, ".parquet"))
+  for (i in 1:max_iter) {
+    x <- try(read_parquet(fpath, col_select = tgt_col))
+    if (inherits(x, "data.frame")) {
+      return(x)
+    }
+  }
+}
+
+#' @export
 read_msl <- function(bucket) {
   try_read(bucket, "meta-tables/tbl_msl.parquet")
+}
+
+#' @title Read Returns
+#' @param ids ticker, cusip, lei, dtc name, or identifier
+#' @param bucket S3FileSystem object
+#' @param tbl_msl option to pass through a custom master security list,
+#'   leave NULL for default MSL
+#' @return xts of time-series of ids, will warn if some ids are not found
+#' @export
+read_ret <- function(ids, bucket, tbl_msl = NULL) {
+  if (is.null(tbl_msl)) {
+    tbl_msl <- read_msl(bucket)
+  }
+  ids_dict <- filter(
+    tbl_msl,
+    DtcName %in% ids | Ticker %in% ids | Cusip %in% ids | Sedol %in% ids |
+      Lei %in% ids |  Identifier %in% ids
+  )
+  found <- ids %in% ids_dict$DtcName | ids %in% ids_dict$Ticker |
+    ids %in% ids_dict$Cusip | ids %in% ids_dict$Lei | ids %in% ids_dict$Lei |
+    ids %in% ids_dict$Identifier
+  if (all(!found)) {
+    warning("no ids found")
+    return(NULL)
+  }
+  if (any(!found)) {
+    warning(paste0(ids[!found], " not found. "))
+  }
+  ret_src <- unique(na.omit(ids_dict$ReturnLibrary))
+  ret_meta <- try_read(bucket, "meta-tables/ret-meta.parquet")
+  ret_data <- left_join(data.frame(ReturnLibrary = ret_src),
+                        ret_meta, by = "ReturnLibrary")
+  res <- list()
+  for (i in 1:length(ret_src)) {
+    x_dict <- filter(ids_dict, ReturnLibrary %in% ret_src[i])
+    record <- read_ret_par(bucket, ret_src[i],
+                           tgt_col = c("Date", x_dict$DtcName))
+    if (ncol(record) == 1) {
+      warning(x_dict$DtcName)
+      next
+    }
+    res[[i]] <- dataframe_to_xts(record)
+  }
+  if ("monthly" %in% ret_data$Freq) {
+    for (i in 1:length(res)) {
+      res[[i]] <- change_freq(res[[i]])
+    }
+  }
+  if (length(res) == 1) {
+    ret <- res[[1]]
+  } else {
+    ret <- do.call("cbind", res)
+    nm <- unlist(lapply(res, colnames))
+    colnames(ret) <- nm
+  }
+  ix <- match_ids_dtc_name(ids, tbl_msl)
+  dtc_name <- tbl_msl$DtcName[na.omit(ix)]
+  ret <- ret[, dtc_name[dtc_name %in% colnames(ret)]]
+  return(ret)
 }
