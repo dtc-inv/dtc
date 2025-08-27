@@ -398,7 +398,7 @@ ret_ctf_monthly <- function(bucket, xl_path = NULL, skip = 4) {
 
 # workup ----
 
-#' @description read in manually uploaded returns from Excel
+#' @title read in manually uploaded returns from Excel
 #' @param xl_file full file path of excel workbook
 #' @return does not return data, updates "workup" record in database
 #' @export
@@ -548,6 +548,7 @@ ret_model = function(bucket, api_keys, dtc_name = NULL, months_back = 1) {
   }
 }
 
+# stocks----
 
 #' @title Update stock returns
 #' @param ids optional parameter to only update certain stocks, leave NULL
@@ -560,17 +561,19 @@ ret_model = function(bucket, api_keys, dtc_name = NULL, months_back = 1) {
 #' @return does not return data, either updates "us-stock" or "intl-stock"
 #'   records in database
 #' @seealso \code{\link{download_fs_global_prices}}
+#' @export
 ret_stock = function(bucket, api_keys,
-                     ids = NULL, date_start = NULL, date_end = Sys.Date(),
+                     ids = NULL, date_start = NULL, date_end = NULL,
                      freq = "D", geo = c("us", "intl")) {
 
+  tbl_msl <- read_msl(bucket)
   geo <- tolower(geo[1])
   if (!geo %in% c("us", "intl")) {
     stop("geo must be us or intl")
   }
   geo <- paste0(geo, "-stock")
   if (is.null(ids)) {
-    stock <- filter(self$tbl_msl, ReturnLibrary == geo)
+    stock <- filter(tbl_msl, ReturnLibrary == geo)
     ids <- create_ids(stock)
   } else {
     ix <- match_ids_dtc_name(ids, self$tbl_msl)
@@ -578,17 +581,23 @@ ret_stock = function(bucket, api_keys,
       stop("ids missing from MSL")
     }
   }
-  lib <- self$ac$get_library("returns")
-  old_dat <- lib$read(geo)$data
+  fpath <- paste0("returns/", geo, ".parquet")
+  old_dat <- try_read(bucket, fpath)
+  if (is.null(old_dat)) {
+    stop("could not read old stock returns")
+  }
   if (is.null(date_start)) {
     date_start <- old_dat$Date[nrow(old_dat)]
-    date_start <- as.Date(date_start)
+    date_start <- prev_trading_day(as.Date(date_start), 1)
+  }
+  if (is.null(date_end)) {
+    date_end <- last_us_trading_day()
   }
   iter <- space_ids(ids)
   xdf <- data.frame()
   for (i in 1:(length(iter)-1)) {
     json <- download_fs_global_prices(
-      api_keys = self$api_keys,
+      api_keys = api_keys,
       ids = ids[iter[i]:iter[i+1]],
       date_start = date_start,
       date_end = date_end,
@@ -598,8 +607,8 @@ ret_stock = function(bucket, api_keys,
     print(iter[i])
     Sys.sleep(1)
   }
-  ix <- match_ids_dtc_name(xdf$RequestId, self$tbl_msl)
-  dtc_name <- self$tbl_msl$DtcName[ix]
+  ix <- match_ids_dtc_name(xdf$RequestId, tbl_msl)
+  dtc_name <- tbl_msl$DtcName[ix]
   xdf$DtcName <- dtc_name
   is_dup <- duplicated(paste0(xdf$DtcName, xdf$Date))
   xdf <- xdf[!is_dup, ]
@@ -607,17 +616,75 @@ ret_stock = function(bucket, api_keys,
   new_dat <- pivot_wider(xdf, id_cols = Date, values_from = TotalReturn,
                          names_from = DtcName)
   combo <- xts_rbind(new_dat, old_dat, FALSE, TRUE)
-  lib$write(geo, xts_to_arc(combo))
+  try_write(bucket, xts_to_dataframe(combo), fpath)
 }
 
+# hfr index ----
 
+#' @title Update HFRI Return index from csv file
+#' @param file_nm full file name of csv file
+#' @seealso \code{\link{read_hfr_index}}
+#' @return does not return data, updates "hfr-index" record in the database
+ret_hfr_index = function(file_nm) {
+  dat <- read_hfr_csv(file_nm)
+  dat <- dat / 100
+  try_write(bucket, xts_to_dataframe(dat), "returns/hfr-index.parquet")
+}
 
+# cash plus x ----
 
+#' @title Update returns that require computational changes
+#' @details
+#' for example cash plus 200 bps reads the returns of cash, adds 200 bps,
+#' and then saves as a new data-field (return column)
+#' @return does not return data, updates various return records in the database
+ret_comp = function() {
+  # cash plus 200 and 400 bps
+  cash <- read_ret("BofAML U.S. Treasury Bill 3M", bucket)
+  cash_plus_2 <- cash + 0.02 / 252
+  cash_plus_4 <- cash + 0.04 / 252
+  rec <- try_read(bucket, "returns/index.parquet")
+  if (is.null(rec)) {
+    stop("could not load index returns for cash plus")
+  }
+  rec[, "Cash Plus 200 bps"] <- as.vector(cash_plus_2)
+  rec[, "Cash Plus 400 bps"] <- as.vector(cash_plus_4)
+  try_write(bucket, rec, "returns/index.parquet")
+  # money market proxy with cash
+  mmkt <- cash
+  colnames(mmkt) <- "Blackrock Liquidity Fed Funds (TFDXX)"
+  try_write(bucket, xts_to_dataframe(mmkt), "returns/money-market.parquet")
+}
 
+# fred ----
 
-
-
-
-
+#' @title Update econ time-series from St. Louis FED (FRED)
+#' @return does not return data, updates "fred-monthly" record in database
+ret_fred = function(bucket) {
+  tbl_msl <- read_msl(bucket)
+  dict <- filter(tbl_msl, ReturnLibrary == "fred-monthly")
+  fred <- try_read(bucket, "meta-tables/fred-meta.parquet")
+  x <- left_merge(dict, fred$data, match_by = "DtcName")
+  if (nrow(x$miss) > 0) {
+    warning(x$miss$DtcName)
+  }
+  if (nrow(x$inter) == 0) {
+    stop("no fred records found")
+  }
+  dat <- list()
+  for (i in 1:nrow(x$inter)) {
+    dat[[i]] <- download_fred(x$inter$Ticker[i], self$api_keys$fred)
+    if (tolower(x$inter$Type[i]) == "price") {
+      dat[[i]] <- price_to_ret(dat[[i]])
+    }
+  }
+  r <- do.call(cbind.xts, dat)
+  tix <- sapply(dat, colnames)
+  ix <- match_ids_dtc_name(tix, self$tbl_msl)
+  dtc_name <- self$tbl_msl$DtcName[ix]
+  colnames(r) <- dtc_name
+  r <- xts_eo_month(r)
+  try_write(bucket, xts_to_dataframe(r), "returns/fred-monthly.parquet")
+}
 
 
