@@ -1,13 +1,14 @@
 # ctf daily ----
 
-hold_ctf_daily <- function(api_keys, as_of) {
+#' @export
+hold_ctf_daily <- function(api_keys, as_of = NULL) {
   if (is.null(as_of)) {
     as_of <- last_us_trading_day()
   }
-  api_keys$bd_key <- refresh_bd_key(api_keys$bd_key)
-  id <- download_bd_batch_id(self$api_keys, as_of)
+  api_keys$bd_key <- refresh_bd_key(api_keys$bd_key, save_local = TRUE)
+  id <- download_bd_batch_id(api_keys, as_of)
   Sys.sleep(120)
-  res <- download_bd_batch(self$api_keys, id$id)
+  res <- download_bd_batch(api_keys, id$id)
   json <- unzip_bd_batch(res)
   handle_bd_batch(bucket, json, as_of)
 }
@@ -21,6 +22,7 @@ hold_ctf_daily <- function(api_keys, as_of) {
 #'   day
 #' @return no data returned, row binds new returns to database "ctf-daily"
 #'   record
+#' @export
 ret_ctf_daily = function(bucket, date_start = NULL, date_end = NULL) {
   if (is.null(date_end)) {
     date_end <- last_us_trading_day()
@@ -61,6 +63,9 @@ ret_ctf_daily = function(bucket, date_start = NULL, date_end = NULL) {
   new_ret <- cut_time(new_ret, date_start, date_end)
   colnames(new_ret) <- paste0(sapply(res, colnames), " Daily Est.")
   old_ret <- try_read(bucket, "returns/ctf-daily.parquet")
+  if (is.null(old_ret)) {
+    stop("could not read ctf-daily")
+  }
   combo <- xts_rbind(xts_to_dataframe(new_ret), old_ret, is_xts = FALSE,
                      backfill = TRUE)
   try_write(bucket, xts_to_dataframe(combo), "returns/ctf-daily.parquet")
@@ -99,6 +104,9 @@ ret_ctf_daily = function(bucket, date_start = NULL, date_end = NULL) {
   colnames(new_ret) <- sapply(res, colnames)
   new_ret <- cut_time(new_ret, date_start, date_end)
   old_ret <- try_read(bucket, "returns/ctf-daily.parquet")
+  if (is.null(old_ret)) {
+    stop("could not read ctf-daily")
+  }
   combo <- xts_rbind(xts_to_dataframe(new_ret),
                      old_ret, is_xts = FALSE,
                      backfill = TRUE)
@@ -111,20 +119,21 @@ ret_ctf_daily = function(bucket, date_start = NULL, date_end = NULL) {
 #' @param ids leave NULL to update all mutual funds, or enter specific
 #'   mutual fund, note if ids are entered they must be in the MSL
 #' @param days_back how many days to download
-ret_mutual_fund = function(bucket, ids = NULL, days_back = 1) {
+#' @export
+ret_mutual_fund = function(bucket, api_keys, ids = NULL, days_back = 1) {
   tbl_msl <- read_msl(bucket)
   if (is.null(ids)) {
-    mf <- filter(self$tbl_msl, ReturnLibrary == "mutual-fund")
+    mf <- filter(tbl_msl, ReturnLibrary == "mutual-fund")
     ids <- mf$Ticker
   } else {
-    mf <- filter(self$tbl_msl, Ticker %in% ids)
+    mf <- filter(tbl_msl, Ticker %in% ids)
   }
   formulas <- paste0('P_TOTAL_RETURNC(-', days_back, 'D,NOW,D,USD)')
   iter <- space_ids(ids)
   xdf <- data.frame()
   for (i in 1:(length(iter)-1)) {
     json <- download_fs_formula(
-      api_keys = self$api_keys,
+      api_keys = api_keys,
       ids = ids[iter[i]:iter[i+1]],
       formulas = formulas
     )
@@ -137,12 +146,63 @@ ret_mutual_fund = function(bucket, ids = NULL, days_back = 1) {
   new_dat <- pivot_wider(xdf[!is_dup, ], id_cols = date,
                          names_from = DtcName, values_from = TotalReturn)
   colnames(new_dat)[1] <- "Date"
-  lib <- self$ac$get_library("returns")
-  old_dat <- lib$read("mutual-fund")$data
-  combo <- xts_rbind(new_dat, old_dat, FALSE)
+  old_dat <- try_read(bucket, "returns/mutual-fund.parquet")
+  if (is.null(old_dat)) {
+    stop("could not read mutual fund old data")
+  }
+  combo <- xts_rbind(new_dat, old_dat, FALSE, TRUE)
   combo_df <- xts_to_dataframe(combo)
-  combo_df$Date <- as.character(combo_df$Date)
-  lib$write("mutual-fund", combo_df)
+  try_write(bucket, combo_df, "returns/mutual-fund.parquet")
 }
 
+# etfs ----
 
+#' @title Update ETF returns from Factset
+#' @param ids leave `NULL` to udpate all ETFs in the Master Security List,
+#'   or enter a vector to only update specific ETFs
+#' @param date_start beginning date for update, if left `NULL` will
+#'   default to the last date of the existing data
+#' @param date_end ending date for update, by default is yesterday
+#' @export
+ret_etf = function(bucket, api_keys, ids = NULL, date_start = NULL,
+                   date_end = NULL) {
+
+  tbl_msl <- read_msl(bucket)
+  if (is.null(ids)) {
+    etf <- filter(tbl_msl, ReturnLibrary == "etf")
+    ids <- etf$Ticker
+  } else {
+    etf <- filter(tbl_msl, Ticker %in% ids)
+  }
+  if (is.null(date_end)) {
+    date_end <- last_us_trading_day()
+  }
+  old_dat <- try_read(bucket, "returns/etf.parquet")
+  if (is.null(old_dat)) {
+    stop("could not read etf old data")
+  }
+  if (is.null(date_start)) {
+    date_start <- prev_trading_day(as.Date(old_dat$Date[nrow(old_dat)]), 2)
+  }
+  iter <- space_ids(ids)
+  xdf <- data.frame()
+  for (i in 1:(length(iter)-1)) {
+    json <- download_fs_global_prices(
+      api_keys = api_keys,
+      ids = ids[iter[i]:iter[i+1]],
+      date_start = date_start,
+      date_end = date_end,
+      freq = "D"
+    )
+    xdf <- rob_rbind(xdf, flatten_fs_global_prices(json))
+    print(iter[i])
+  }
+  xdf$DtcName <- etf$DtcName[match(xdf$RequestId, etf$Ticker)]
+  is_dup <- duplicated(paste0(xdf$Date, xdf$DtcName))
+  xdf$TotalReturn <- xdf$TotalReturn / 100
+  new_dat <- pivot_wider(xdf[!is_dup, ], id_cols = Date,
+                         names_from = DtcName, values_from = TotalReturn)
+  combo <- xts_rbind(new_dat, old_dat, FALSE)
+  combo_df <- xts_to_dataframe(combo)
+  try_write(bucket, combo_df, "returns/etf.parquet")
+}

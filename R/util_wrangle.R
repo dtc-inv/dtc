@@ -1,3 +1,54 @@
+
+#' @title Space Out ids in multiple iterations
+#' @param ids vector of ids
+#' @param max_ids max number of ids per iteration
+#' @details utility function for factset download that limits number of ids per
+#'  api call
+#' @return iteration index
+#' @export
+space_ids <- function(ids, max_ids = 50) {
+  if (length(ids) > max_ids) {
+    iter <- iter <- seq(1, length(ids), (max_ids - 1))
+    if (iter[length(iter)] < length(ids)) {
+      iter <- c(iter, length(ids))
+    }
+    ret_list <- list()
+  } else {
+    iter <- c(1, length(ids))
+  }
+  return(iter)
+}
+
+#' @export
+clean_ids <- function(tbl_hold) {
+  if ("Cusip" %in% colnames(tbl_hold)) {
+    ix <- tbl_hold[, "Cusip"] == "000000000"
+    if (any(na.omit(ix))) {
+      tbl_hold[ix, "Cusip"] <- NA
+    }
+  }
+  return(tbl_hold)
+}
+
+#' @export
+get_ids <- function(tbl_hold) {
+  tbl_hold <- clean_ids(tbl_hold)
+  id_field <- c("DtcName", "Ticker", "Cusip", "Sedol", "Lei", "Identifier")
+  id_bool <- id_field %in% colnames(tbl_hold)
+  if (!any(id_bool)) {
+    stop("no id fields found")
+  }
+  tbl_id <- tbl_hold[, id_field[id_bool], drop = FALSE]
+  ids <- tbl_id[, 1]
+  if (ncol(tbl_id) > 1) {
+    for (i in 2:ncol(tbl_id)) {
+      ids[is.na(ids)] <- tbl_id[, i][is.na(ids)]
+    }
+  }
+  ids <- unique(ids)
+  return(ids)
+}
+
 #' @export
 extract_list <- function(x, nm) {
   y <- lapply(x, '[[', nm)

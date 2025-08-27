@@ -121,6 +121,7 @@ download_fred <- function(series_id, fred_api) {
 #' @param api_keys list of API Keys
 #' @param save_to_n if on DTC network option to save to N: drive
 #' @param save_local save to local directory, e.g., "~/"
+#' @param return returns the bd section of the api_keys (api_keys$bd_key)
 #' @export
 refresh_bd_key <- function(api_keys, save_to_n = FALSE, save_local = FALSE) {
   bd_key <- api_keys$bd_key
@@ -218,9 +219,8 @@ download_bd_batch <- function(api_keys, batch_id) {
 unzip_bd_batch <- function(resp) {
   tmp <- tempfile(fileext = ".zip")
   brio::write_file_raw(resp$content, path = tmp)
-  ufile <- try(unzip(tmp, exdir = "~/json/"))
-  print(ufile)
-  if (inherits(ufile, "try-error")) {
+  ufile <- unzip(tmp, exdir = "~/json/")
+  if (is.null(ufile)) {
     save(resp, file = "~/resp.RData")
     stop("error in unzipping, saving ~/resp.RData")
   }
@@ -280,12 +280,14 @@ handle_bd_batch <- function(bucket, json, as_of) {
       } # end cf loop
     } # end any cf
     cf_dat$DtcName <- dtc_name
-    old_dat <- try(lib$transactions$read(dtc_name)$data)
-    if ("try-error" %in% class(old_dat)) {
-      old_dat <- data.frame()
+    fpath <- paste0("transactions/", dtc_name, ".parquet")
+    old_dat <- try_read(bucket, fpath)
+    if (is.null(old_dat)) {
+      warning(paste0("no old data for ", dtc_name))
+      next
     }
     combo <- rbind_tx(old_dat, cf_dat)
-    lib$transactions$write(dtc_name, combo)
+    try_write(bucket, combo, fpath)
     hold <- x$Holdings
     fld <- sapply(hold, names) |> unlist() |> unique()
     xdf <- data.frame(x = rep(NA, length(hold)))
