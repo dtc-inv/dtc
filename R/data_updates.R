@@ -113,6 +113,42 @@ ret_ctf_daily = function(bucket, date_start = NULL, date_end = NULL) {
   try_write(bucket, xts_to_dataframe(combo), "returns/ctf-daily.parquet")
 }
 
+#' @title Adjust daily CTF return estimates to land on month end returns
+#' @return does not return data, updates "ctf-daily" record in database
+#' @export
+ret_ctf_daily_adj = function() {
+  ctf_meta <- try_read(bucket, "meta-tables/ctf-meta.parquet")
+  daily <- try_read(bucket, "returns/ctf-daily.parquet")
+  if (is.null(daily)) {
+    stop("could not load ctf daily returns")
+  }
+  daily <- dataframe_to_xts(daily)
+  monthly <- try_read(bucket, "returns/ctf-monthly.parquet")
+  if (is.null(monthly)) {
+    stop("could not load ctf monthly returns")
+  }
+  monthly <- dataframe_to_xts(monthly)
+  for (i in 1:ncol(daily)) {
+    d <- daily[, i]
+    d <- clean_ret(d, eps = 1)
+    d <- d$ret
+    ix <- colnames(monthly) %in% gsub(" Daily Est.", "", colnames(d))
+    if (sum(ix) == 0) {
+      warning(paste0(colnames(d), " not found in monthly returns"))
+      next
+    }
+    m <- monthly[, ix]
+    res <- try(daily_spline(d, m))
+    if (inherits(res, "try-error")) {
+      warning(paste0(colnames(d), " did not spline"))
+      next
+    }
+    incpt <- zoo::index(res)[1]
+    daily[paste0(incpt, "/"), i] <- res
+  }
+  try_write(bucket, xts_to_dataframe(daily), "ctf-daily")
+}
+
 # mutual funds ----
 
 #' @title Update index returns from Factset
@@ -206,3 +242,382 @@ ret_etf = function(bucket, api_keys, ids = NULL, date_start = NULL,
   combo_df <- xts_to_dataframe(combo)
   try_write(bucket, combo_df, "returns/etf.parquet")
 }
+
+# index ----
+
+#' @title Update index returns from Factset
+#' @param ids leave NULL to update all indexes, or enter specific index
+#'   DtcName to update, note ids will have to first exist in the Master Security
+#'   List `tbl_msl`
+#' @param t_minus_m how many months to download
+#' @export
+ret_index = function(bucket, api_keys, ids = NULL, t_minus_m = 1) {
+  tbl_msl <- read_msl(bucket)
+  if (is.null(ids)) {
+    idx <- filter(tbl_msl, ReturnLibrary == "index")
+    ids <- idx$Ticker
+  } else {
+    idx <- filter(tbl_msl, DtcName %in% ids)
+    if (nrow(idx) == 0) {
+      stop("ids not found, need to specify DtcName(s) in MSL")
+    }
+    ids <- idx$Ticker
+  }
+  res <- list()
+  is_miss <- rep(FALSE, length(ids))
+  for (i in 1:length(ids)) {
+    dat <- try(download_fs_ra_ret(ids[i], api_keys, t_minus_m, "D"))
+    if ("try-error" %in% class(dat)) {
+      is_miss[i] <- TRUE
+    } else {
+      res[[i]] <- dat
+    }
+  }
+  ret <- do.call("cbind", res)
+  dtc_name <- idx$DtcName[!is_miss]
+  colnames(ret) <- dtc_name
+  old_dat <- try_read(bucket, "returns/index.parquet")
+  if (is.null(old_dat)) {
+    stop("could not read index old data")
+  }
+  new_dat <- xts_to_dataframe(ret)
+  combo <- xts_rbind(new_dat, old_dat, FALSE)
+  combo_df <- xts_to_dataframe(combo)
+  try_write(bucket, combo_df, "returns/index.parquet")
+}
+
+#' @title Update Private Asset Indexes from Excel
+#' @export
+ret_private_index = function() {
+  base <- "N:/Investment Team/DATABASES/CustomRet/PE-Downloads/"
+  pe_q <- read_private_xts(
+    paste0(base, "PrivateEquity.xlsx"),
+    "Private Equity Index"
+  )
+  pe_q <- unsmooth_ret(pe_q)
+  re_q <- read_private_xts(
+    paste0(base, "PrivateRealEstateValueAdd.xlsx"),
+    "Private Real Estate Value Add Index"
+  )
+  re_q <- unsmooth_ret(re_q)
+  reg_q <- read_private_xts(
+    paste0(base, "PrivateRealEstate.xlsx"),
+    "Private Real Estate Index"
+  )
+  reg_q <- unsmooth_ret(reg_q)
+  pc_q <- read_private_xts(
+    paste0(base, "PrivateCredit.xlsx"),
+    "Private Credit Index"
+  )
+  pc_q <- unsmooth_ret(pc_q)
+  vc_q <- read_private_xts(
+    paste0(base, "VentureCapital.xlsx"),
+    "Venture Capital Index"
+  )
+  vc_q <- unsmooth_ret(vc_q)
+  ind <- try_read(bucket, "returns/index.parquet")
+  ind <- dataframe_to_xts(ind)
+  pe_m <- change_freq(na.omit(ind$`Russell 2000`))
+  re_m <- change_freq(na.omit(ind$`Wilshire US REIT`))
+  pc_m <- change_freq(na.omit(ind$`BofAML U.S. HY Master II`))
+  pe <- monthly_spline(pe_m, pe_q)
+  re <- monthly_spline(re_m, re_q)
+  reg <- monthly_spline(re_m, reg_q)
+  pc <- monthly_spline(pc_m, pc_q)
+  vc <- monthly_spline(pe_m, vc_q)
+  colnames(pe) <- "Private Equity Index"
+  colnames(re) <- "Private Real Estate Value Add Index"
+  colnames(reg) <- "Private Real Estate Index"
+  colnames(pc) <- "Private Credit Index"
+  colnames(vc) <- "Private Venture Capital Index"
+  dat <- xts_cbind(pe, re)
+  dat <- xts_cbind(dat, reg)
+  dat <- xts_cbind(dat, pc)
+  dat <- xts_cbind(dat, vc)
+  xdf <- xts_to_dataframe(dat)
+  xdf$Date <- as.character(xdf$Date)
+  try_write(bucket, xdf, "returns/private-index.parquet")
+}
+
+# ctf monthly ----
+
+#' @title Upload Month End CTF Reconciled Returns into the Database
+#' @param ac arcticDB datastore
+#' @param xl_path filepath of excel workbook with returns, leave `NULL` for
+#'   default
+#' @param skip leading header rows to skip, default is `4`
+#' @return no data is returned, the entire history is read and stored in
+#'   arcticDB
+#' @export
+ret_ctf_monthly <- function(bucket, xl_path = NULL, skip = 4) {
+  tbl_cust <- try_read(bucket, "meta-tables/cust.parquet")
+  if (is.null(xl_path)) {
+    xl_path <- "N:/Investment Team/DATABASES/FACTSET/BMO NAV & Platform Return Upload.xlsx"
+  }
+  dat <- read_xts(xl_path, skip = skip)
+  ix <- match(tbl_cust$WorkupId, colnames(dat))
+  if (any(is.na(ix))) {
+    if (all(is.na(ix))) {
+      stop("no values found")
+    }
+    warning("missing values created when matching workup excel to custodian library")
+    ix <- na.omit(ix)
+
+  }
+  r <- dat[, ix]
+  nm_tgt <- match(colnames(r), tbl_cust$WorkupId)
+  colnames(r) <- tbl_cust$DtcName[nm_tgt]
+  # manually get HFs - need better process here
+  tgt <- c(
+    "DTC PRIVATE DIVERSIFIERS II COMMON FUND (NoC)",
+    "DTC PRIVATE DIVERSIFIERS COMMON FUND (NoC)",
+    "DTC SHORT DURATION FIXED INCOME COMMON FUND (NoC)",
+    "Magnitude International Class A  (Net)",
+    "Turion Onshore, L.P. (Net)",
+    "Granville Multi-Strategy Partners, L.P. (Net)",
+    "Granville Equity Partners, L.P. (Net)",
+    "Winston Global Fund, L.P. (Net)",
+    "Winston Hedged Equity Fund, L.P. (Net)"
+  )
+  x <- dat[, tgt[1:3]]
+  colnames(x)<- c(
+    "Private Diversifiers",
+    "Private Diversifiers II",
+    "Short Duration"
+  )
+  r <- xts_cbind(r, x)
+  r <- r["1994/"] / 100
+  old_ret <- try_read(bucket, "returns/ctf.parquet")
+  if (is.null(old_ret)) {
+    stop("could not load ctf old ret")
+  }
+  combo <- xts_rbind(xts_to_dataframe(r),
+                     old_ret,is_xts = FALSE, backfill = TRUE)
+  try_write(bucket, xts_to_dataframe(combo), "returns/ctf.parquet")
+}
+
+# workup ----
+
+#' @description read in manually uploaded returns from Excel
+#' @param xl_file full file path of excel workbook
+#' @return does not return data, updates "workup" record in database
+#' @export
+ret_workup = function(
+    xl_file = "N:/Investment Team/DATABASES/CustomRet/workup.xlsx") {
+
+  dat <- read_xts(xl_file)
+  dat <- xts_to_dataframe(dat)
+  try_write(bucket, dat, "returns/workup.parquet")
+}
+
+#' @title read in returns to backfill daily and monthly returns
+#' @export
+ret_backfill = function() {
+  xl_file <- "N:/Investment Team/DATABASES/CustomRet/backfill-daily.xlsx"
+  backfill <- read_xts(xl_file)
+  backfill <- xts_to_dataframe(backfill)
+  try_write(bucket, backfill, "returns/backfill-daily.parquet")
+  xl_file <- "N:/Investment Team/DATABASES/CustomRet/backfill-monthly.xlsx"
+  backfill <- read_xts(xl_file)
+  backfill <- xts_to_dataframe(backfill)
+  try_write(bucket, backfill, "returns/backfill-monthly.parquet")
+}
+
+#' @title execute backfill
+#' @export
+run_backfill = function() {
+  ret_meta <- try_read(bucket, "meta-tables/ret-meta.parquet")
+  daily <- try_read(bucket, "returns/backfill-daily.parquet")
+  if (is.null(daily)) {
+    stop("could not read daily backfill")
+  }
+  tbl_msl <- read_msl(bucket)
+  dd <- filter(tbl_msl, DtcName %in% colnames(daily)[-1])
+  if (nrow(dd > 0)) {
+    ret_lib <- na.omit(unique(dd$ReturnLibrary))
+  }
+  if (length(ret_lib) > 0) {
+    ret_lib <- data.frame(ReturnLibrary = ret_lib)
+    res <- left_merge(ret_lib, ret_meta, "ReturnLibrary")
+    ret_lib <- res$inter
+    if (any(ret_lib$Freq != "daily")) {
+      print(ret_lib)
+      stop("daily backfill for wrong frequency")
+    }
+    for (i in 1:nrow(ret_lib)) {
+      x <- filter(dd, ReturnLibrary %in% ret_lib$ReturnLibrary[i])
+      fpath <- paste0("returns/", ret_lib$ReturnLibrary[i], ".parquet")
+      new <- try_read(bucket, fpath)
+      if (is.null(new)) {
+        stop(paste0("could not read ", fpath))
+      }
+      combo <- xts_rbind(new, daily[, c("Date", x$DtcName)], FALSE, TRUE)
+      combo <- xts_to_dataframe(combo)
+      try_write(bucket, combo, fpath)
+    }
+  }
+  monthly <- try_read(bucket, "returns/backfill-monthly.parquet")
+  if (is.null(monthly)) {
+    stop("could not read monthly backfill")
+  }
+  dd <- filter(self$tbl_msl, DtcName %in% colnames(monthly)[-1])
+  if (nrow(dd > 0)) {
+    ret_lib <- na.omit(unique(dd$ReturnLibrary))
+  }
+  if (length(ret_lib) > 0) {
+    ret_lib <- data.frame(ReturnLibrary = ret_lib)
+    res <- left_merge(ret_lib, ret_meta, "ReturnLibrary")
+    ret_lib <- res$inter
+    if (any(ret_lib$Freq != "monthly")) {
+      print(ret_lib)
+      stop("monthly backfill for wrong frequency")
+    }
+    for (i in 1:nrow(ret_lib)) {
+      x <- filter(dd, ReturnLibrary %in% ret_lib$ReturnLibrary[i])
+      fpath <- paste0("returns/", ret_lib$ReturnLibrary[i], ".parquet")
+      new <- try_read(bucket, fpath)
+      if (is.null(new)) {
+        stop(paste0("could not read ", fpath))
+      }
+      combo <- xts_rbind(new, monthly[, c("Date", x$DtcName)], FALSE, TRUE)
+      combo <- xts_to_dataframe(combo)
+      try_write(bucket, combo, fpath)
+    }
+  }
+}
+
+#' @title Update returns of models
+#' @param dtc_name option to specify specific models to update, leave NULL
+#'   to update all models
+#' @param months_back integer representing how many months back to update
+#'   returns for, default is 1
+#' @export
+ret_model = function(bucket, api_keys, dtc_name = NULL, months_back = 1) {
+  msl <- read_msl(bucket)
+  model <- try_read(bucket, "meta-tables/model.parquet")
+  if (!is.null(dtc_name)) {
+    model <- filter(model, DtcName %in% dtc_name)
+  }
+  d <- filter(model, ReturnLibrary == "model-daily")
+  d_id <- filter(msl, DtcName %in% d$DtcName)
+  if (nrow(d_id) > 0) {
+    dat <- list()
+    found <- rep(TRUE, nrow(d_id))
+    for (i in 1:nrow(d_id)) {
+      x <- try(download_fs_ra_ret(d_id$Identifier[i], api_keys,
+                                  months_back))
+      if ("try-error" %in% class(x)) {
+        found[i] <- FALSE
+      } else {
+        dat[[i]] <- x
+      }
+    }
+    r <- do.call(cbind, dat)
+    colnames(r) <- d_id$DtcName[found]
+    new <- xts_to_dataframe(r)
+    old <- try_read(bucket, "returns/model-daily.parquet")
+    if (is.null(old)) {
+      stop("could not read old daily model returns")
+    }
+    combo <- xts_rbind(new, old, FALSE)
+    try_write(bucket, xts_to_dataframe(combo), "model-daily")
+  }
+  m <- filter(model, ReturnLibrary == "model-monthly")
+  m_id <- filter(msl, DtcName %in% m$DtcName)
+  if (nrow(m_id) > 0) {
+    dat <- list()
+    found <- rep(TRUE, nrow(m_id))
+    for (i in 1:nrow(m_id)) {
+      x <- try(download_fs_ra_ret(m_id$Identifier[i], api_keys,
+                                  months_back, "M"))
+      if ("try-error" %in% class(x)) {
+        found[i] <- FALSE
+      } else {
+        dat[[i]] <- x
+      }
+    }
+    r <- do.call(cbind, dat)
+    colnames(r) <- m_id$DtcName[found]
+    new <- xts_to_dataframe(r)
+    old <- try_read(bucket, "returns/model-monthly.parquet")
+    if (is.null(old)) {
+      stop("could not read monthly model old returns")
+    }
+    combo <- xts_rbind(new, old, FALSE)
+    try_write(bucket, xts_to_dataframe(combo), "model-monthly")
+  }
+}
+
+
+#' @title Update stock returns
+#' @param ids optional parameter to only update certain stocks, leave NULL
+#'   to update all stocks in the MSL
+#' @param date_start starting date for new returns, default is NULL which
+#'   will find most recent date of existingg returns to start
+#' @param date_end most recent date for new returns, default is Sys.Date()
+#' @param freq "D" for daily
+#' @param geo "us" for US Stocks or "intl" for international stocks
+#' @return does not return data, either updates "us-stock" or "intl-stock"
+#'   records in database
+#' @seealso \code{\link{download_fs_global_prices}}
+ret_stock = function(bucket, api_keys,
+                     ids = NULL, date_start = NULL, date_end = Sys.Date(),
+                     freq = "D", geo = c("us", "intl")) {
+
+  geo <- tolower(geo[1])
+  if (!geo %in% c("us", "intl")) {
+    stop("geo must be us or intl")
+  }
+  geo <- paste0(geo, "-stock")
+  if (is.null(ids)) {
+    stock <- filter(self$tbl_msl, ReturnLibrary == geo)
+    ids <- create_ids(stock)
+  } else {
+    ix <- match_ids_dtc_name(ids, self$tbl_msl)
+    if (any(is.na(ix))) {
+      stop("ids missing from MSL")
+    }
+  }
+  lib <- self$ac$get_library("returns")
+  old_dat <- lib$read(geo)$data
+  if (is.null(date_start)) {
+    date_start <- old_dat$Date[nrow(old_dat)]
+    date_start <- as.Date(date_start)
+  }
+  iter <- space_ids(ids)
+  xdf <- data.frame()
+  for (i in 1:(length(iter)-1)) {
+    json <- download_fs_global_prices(
+      api_keys = self$api_keys,
+      ids = ids[iter[i]:iter[i+1]],
+      date_start = date_start,
+      date_end = date_end,
+      freq = freq
+    )
+    xdf <- rob_rbind(xdf, flatten_fs_global_prices(json))
+    print(iter[i])
+    Sys.sleep(1)
+  }
+  ix <- match_ids_dtc_name(xdf$RequestId, self$tbl_msl)
+  dtc_name <- self$tbl_msl$DtcName[ix]
+  xdf$DtcName <- dtc_name
+  is_dup <- duplicated(paste0(xdf$DtcName, xdf$Date))
+  xdf <- xdf[!is_dup, ]
+  xdf$TotalReturn <- xdf$TotalReturn / 100
+  new_dat <- pivot_wider(xdf, id_cols = Date, values_from = TotalReturn,
+                         names_from = DtcName)
+  combo <- xts_rbind(new_dat, old_dat, FALSE, TRUE)
+  lib$write(geo, xts_to_arc(combo))
+}
+
+
+
+
+
+
+
+
+
+
+
+

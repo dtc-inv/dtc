@@ -812,57 +812,6 @@ read_hfr_csv <- function(file_nm) {
   return(r)
 }
 
-#' @title Upload Month End CTF Reconciled Returns into the Database
-#' @param ac arcticDB datastore
-#' @param xl_path filepath of excel workbook with returns, leave `NULL` for
-#'   default
-#' @param skip leading header rows to skip, default is `4`
-#' @return no data is returned, the entire history is read and stored in
-#'   arcticDB
-#' @export
-upload_ctf_monthly <- function(ac, xl_path = NULL, skip = 4) {
-  lib <- get_all_lib(ac)
-  tbl_cust <- lib$`meta-tables`$read("cust")$data
-  if (is.null(xl_path)) {
-    xl_path <- "N:/Investment Team/DATABASES/FACTSET/BMO NAV & Platform Return Upload.xlsx"
-  }
-  dat <- read_xts(xl_path, skip = skip)
-  ix <- match(tbl_cust$WorkupId, colnames(dat))
-  if (any(is.na(ix))) {
-    if (all(is.na(ix))) {
-      stop("no values found")
-    }
-    warning("missing values created when matching workup excel to custodian library")
-    ix <- na.omit(ix)
-
-  }
-  r <- dat[, ix]
-  nm_tgt <- match(colnames(r), tbl_cust$WorkupId)
-  colnames(r) <- tbl_cust$DtcName[nm_tgt]
-  # manually get HFs - need better process here
-  tgt <- c(
-    "DTC PRIVATE DIVERSIFIERS II COMMON FUND (NoC)",
-    "DTC PRIVATE DIVERSIFIERS COMMON FUND (NoC)",
-    "DTC SHORT DURATION FIXED INCOME COMMON FUND (NoC)",
-    "Magnitude International Class A  (Net)",
-    "Turion Onshore, L.P. (Net)",
-    "Granville Multi-Strategy Partners, L.P. (Net)",
-    "Granville Equity Partners, L.P. (Net)",
-    "Winston Global Fund, L.P. (Net)",
-    "Winston Hedged Equity Fund, L.P. (Net)"
-  )
-  x <- dat[, tgt[1:3]]
-  colnames(x)<- c(
-    "Private Diversifiers",
-    "Private Diversifiers II",
-    "Short Duration"
-  )
-  r <- xts_cbind(r, x)
-  r <- r["1994/"] / 100
-  old_ret <- lib$returns$read("ctf")$data
-  combo <- xts_rbind(xts_to_arc(r), old_ret,is_xts = FALSE, backfill = TRUE)
-  lib$returns$write("ctf", xts_to_arc(combo))
-}
 
 read_daily_ctf_xl <- function(nm) {
   fnm <- paste0("N:/Investment Team/DATABASES/CustomRet/ctf-daily-backfill/",
