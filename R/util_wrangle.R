@@ -328,3 +328,94 @@ merge_msl <- function(tbl_hold, tbl_msl, rm_dup_dates = TRUE) {
   }
   return(res)
 }
+
+#' @title Convert calendar return dataframe to vector
+#' @export
+cal_ret_to_vec <- function(xdf, top_down = TRUE) {
+  if (top_down) {
+    x <- xdf[1, ]
+    for (i in 2:nrow(xdf)) {
+      x <- c(x, xdf[i, ])
+    }
+  } else {
+    x <- xdf[nrow(x), ]
+    for (i in seq((nrow(xdf)-1), 1, -1)) {
+      x <- c(x, xdf[i, ])
+    }
+  }
+  return(as.numeric(x))
+}
+
+#' @export
+pe_cf_twr <- function(wb, cf_sht = "cf", nav_sht = "nav") {
+  cf <- readxl::read_excel(wb, cf_sht)
+  cf <- dataframe_to_xts(cf)
+  nav <- readxl::read_excel(wb, nav_sht)
+  nav <- dataframe_to_xts(nav)
+  inter <- intersect(colnames(cf), colnames(nav))
+  cf <- cf[, inter]
+  nav <- nav[, inter]
+  mod_deitz <- list()
+  tvpi <- rep(NA, ncol(nav))
+  for (i in 1:ncol(nav)) {
+    x <- cbind(cf[, i], nav[, i])
+    q_ret <- na.omit(x[, 2])
+    colnames(q_ret) <- colnames(cf[, i])
+    q_nav <- q_ret
+    is_pi <- cf[, i] < 0
+    is_pi[is.na(pi)] <- FALSE
+    is_distr <- cf[, i] > 0
+    is_distr[is.na(is_distr)] <- FALSE
+    pi <- sum(cf[is_pi, i])
+    distr <- sum(cf[is_distr, i])
+    last_nav <- q_ret[nrow(q_ret)]
+    tvpi[i] <- (last_nav + distr) / -pi
+    for (j in 1:nrow(q_ret)) {
+      q <- zoo::index(q_ret)[j]
+      y <- year(q)
+      m <- month(q)
+      qe <- paste0(y, "-", m)
+      qs <- paste0(y, "-", m-2)
+      wcf <- wgt_cf(x[paste0(qs, "/", qe), 1])
+      cfx <- as.numeric(sum(x[paste0(qs, "/", qe), 1], na.rm = TRUE))
+      if (j == 1) {
+        v0 <- 0
+      } else {
+        v0 <- as.numeric(q_nav[j-1])
+      }
+      v1 <- as.numeric(q_nav[j])
+      pnl <- v1 - v0 + cfx
+      if (-wcf > v0) {
+        wcf <- cfx
+      }
+      q_ret[j] <- pnl / (v0 - wcf )
+    }
+    mod_deitz[[i]] <- q_ret
+  }
+  twr <- do.call(cbind, mod_deitz)
+  colnames(twr) <- colnames(nav)
+  res <- list()
+  res$twr <- twr
+  res$tvpi <- tvpi
+  return(res)
+}
+
+#' @export
+wgt_cf <- function(cf) {
+  cf <- na.omit(cf)
+  if (nrow(cf) == 0) {
+    return(0)
+  }
+  x <- 0
+  for (i in 1:nrow(cf)) {
+    if (month(zoo::index(cf)[i]) %in% c(1, 4, 7, 10)) {
+      x <- x + as.numeric(cf[i]) * 65 / 90
+    } else if (month(zoo::index(cf)[i]) %in% c(2, 5, 8, 11)) {
+      x <- x + as.numeric(cf[i]) * 45 / 90
+    } else {
+      x <- x + as.numeric(cf[i]) * 15 / 90
+    }
+  }
+  return(x)
+}
+
