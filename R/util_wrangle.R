@@ -149,15 +149,6 @@ wgt_avg <- function(w, x) {
   sum(x * w, na.rm = TRUE) / sum(w, na.rm = TRUE)
 }
 
-#' @title Read MSL from Database
-#' @param ac ArcticDB object
-#' @return data.frame of MSL
-#' @export
-read_msl <- function(ac) {
-  lib <- ac$get_library("meta-tables")
-  lib$read("msl")$data
-}
-
 #' @title Check Holdings Table Specification
 #' @param tbl_hold data.frame with holdings, need id, CapWgt, and TimeStamp
 #' @export
@@ -174,3 +165,115 @@ check_tbl_hold <- function(tbl_hold) {
   }
 }
 
+#' @export
+next_trading_day <- function(dates, t_plus = 0) {
+  yrs <- lubridate::year(dates)
+  min_year <- min(yrs) - 1
+  max_year <- max(yrs) + 1
+  bizdays::create.calendar(
+    "cal",
+    holidays = timeDate::holidayNYSE(min_year:max_year),
+    weekdays = c("saturday", "sunday"))
+  bizdays::adjust.next(dates + t_plus, "cal")
+}
+
+#' @export
+prev_trading_day <- function(dates, t_minus = 0) {
+  yrs <- lubridate::year(dates)
+  min_year <- min(yrs) - 1
+  max_year <- max(yrs) + 1
+  bizdays::create.calendar(
+    "cal",
+    holidays = timeDate::holidayNYSE(min_year:max_year),
+    weekdays = c("saturday", "sunday"))
+  bizdays::adjust.previous(dates - t_minus, "cal")
+}
+
+#' @export
+mid_month <- function(dt) {
+  dt <- lubridate::floor_date(dt, "months")
+  prev_trading_day(dt + 14)
+}
+
+#' @export
+match_bd_id <- function(bd_id, tbl_msl, ix = NULL) {
+  incomps <- c(NA, "000000000", "N/A", "0")
+  if (is.null(ix)) {
+    ix <- rep(NA, length(bd_id))
+  }
+  ix <- fill_ix(ix, match(bd_id, tbl_msl$Sedol, incomparables = incomps))
+  ix <- fill_ix(ix, match(bd_id, tbl_msl$Cusip, incomparables = incomps))
+  ix <- fill_ix(ix, match(bd_id, tbl_msl$BdName, incomparables = incomps))
+  return(ix)
+}
+
+
+#' @export
+rbind_holdings <- function(old, new, keep = c("old", "new")) {
+  keep <- tolower(keep[1])
+  if (nrow(old) == 0) {
+    return(new)
+  }
+  if (keep == "old") {
+    ix <- new$TimeStamp %in% unique(old$TimeStamp)
+    if (any(ix)) {
+      new <- new[!ix, ]
+    }
+  }
+  if (keep == "new") {
+    ix <- old$TimeStamp %in% unique(new$TimeStamp)
+    if (any(ix)) {
+      old <- old[!ix, ]
+    }
+  }
+  res <- rbind(old, new)
+  return(res)
+}
+
+#' @export
+xts_cbind <- function(x, y) {
+  combo <- cbind.xts(x, y, check.names = FALSE)
+  colnames(combo) <- c(colnames(x), colnames(y))
+  return(combo)
+}
+
+#' @title Merge MSL with holdings table
+#' @param tbl_hold data.frame with portfolio holdings
+#' @param tbl_msl master security list (data.frame)
+#' @return list with union, intersection, and missing tables
+#' @export
+merge_msl <- function(tbl_hold, tbl_msl, rm_dup_dates = TRUE) {
+  ix <- match_mult(
+    x = tbl_hold,
+    y = tbl_msl,
+    match_by = c("DtcName", "Ticker", "Cusip", "Sedol", "Isin", "Lei",
+                 "Identifier")
+  )
+  if ("Identifier" %in% colnames(tbl_hold)) {
+    ix <- match_bd_id(tbl_hold$Identifier, tbl_msl, ix)
+    if ("Cusip" %in% colnames(tbl_hold)) {
+      ix <- match_bd_id(tbl_hold$Cusip, tbl_msl, ix)
+    }
+    if ("Name" %in% colnames(tbl_hold)) {
+      ix <- match_bd_id(tbl_hold$Name, tbl_msl, ix)
+    }
+  }
+  y_dup_col <- colnames(tbl_msl) %in% colnames(tbl_hold)
+  x_dup_col <- colnames(tbl_hold) %in% colnames(tbl_msl)
+  tbl_union <- cbind(tbl_hold, tbl_msl[ix, !y_dup_col, drop = FALSE])
+  tbl_miss <- tbl_hold[is.na(ix), ]
+  tbl_inter <- cbind(tbl_hold[, !x_dup_col, drop = FALSE], tbl_msl[ix, ])
+  tbl_inter <- tbl_inter[!is.na(ix), ]
+  res <- list()
+  res$inter <- tbl_inter
+  res$union <- tbl_union
+  res$miss <- tbl_miss
+  if (rm_dup_dates) {
+    is_dup <- duplicated(paste0(res$inter$DtcName, res$inter$TimeStamp))
+    if (any(is_dup)) {
+      warning("duplicate dates found, removing")
+      res$inter <- res$inter[!is_dup, ]
+    }
+  }
+  return(res)
+}

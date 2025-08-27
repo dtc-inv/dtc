@@ -112,3 +112,20 @@ read_ret <- function(ids, bucket, tbl_msl = NULL) {
   ret <- ret[, dtc_name[dtc_name %in% colnames(ret)]]
   return(ret)
 }
+
+temp_transfer <- function() {
+  ac <- create_arctic(api_keys)
+  lib <- get_all_lib(ac)
+  xlib <- lib$`co-qual-data`
+  sym <- xlib$list_symbols()
+  bucket <- create_bucket(api_keys)
+  for (i in 1:length(sym)) {
+    x <- xlib$read(sym[i])$data
+    write_parquet(x, bucket$path(paste0("co-data/", sym[i], ".parquet")))
+  }
+}
+
+
+
+
+
