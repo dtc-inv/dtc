@@ -352,7 +352,8 @@ ret_private_index = function() {
 ret_ctf_monthly <- function(bucket, xl_path = NULL, skip = 4) {
   tbl_cust <- try_read(bucket, "meta-tables/cust.parquet")
   if (is.null(xl_path)) {
-    xl_path <- "N:/Investment Team/DATABASES/FACTSET/BMO NAV & Platform Return Upload.xlsx"
+    xl_path <- paste0("N:/Investment Team/DATABASES/FACTSET/",
+    "BMO NAV & Platform Return Upload.xlsx")
   }
   dat <- read_xts(xl_path, skip = skip)
   ix <- match(tbl_cust$WorkupId, colnames(dat))
@@ -360,7 +361,8 @@ ret_ctf_monthly <- function(bucket, xl_path = NULL, skip = 4) {
     if (all(is.na(ix))) {
       stop("no values found")
     }
-    warning("missing values created when matching workup excel to custodian library")
+    warning("missing values created when matching workup excel
+            to custodian library")
     ix <- na.omit(ix)
 
   }
