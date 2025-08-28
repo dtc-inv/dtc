@@ -1,5 +1,14 @@
 # ctf daily ----
 
+#' @title Execute Batch API Download from BlackDiamond
+#' @description
+#' Run before ret_ctf_daily(), the holdings and transactions are needed to
+#'   calculate the estimated return
+#' @param api_keys list with credentials
+#' @param as_of optional parameter for as of date to pull holdings, leave
+#'   NULL for last trading day
+#' @return does not return data, holdings and transactions are stored in
+#'   parquet files in S3
 #' @export
 hold_ctf_daily <- function(api_keys, as_of = NULL) {
   if (is.null(as_of)) {
@@ -15,7 +24,10 @@ hold_ctf_daily <- function(api_keys, as_of = NULL) {
 
 #' @title Update CTF Daily Returns
 #' @description
-#' Update CTF returns each day from Black Diamond bulk data
+#' Update CTF returns each day from Black Diamond batch data.
+#'   The holdings and transactions are needed to create the return estimates.
+#'   See hold_ctf_daily().
+#' @param bucket S3 FileSystem created by create_bucket()
 #' @param date_start first date for return update, defaultt is two trading
 #'   days prior to date_end
 #' @param date_end lastest date for return update, default is last trading
@@ -83,7 +95,7 @@ ret_ctf_daily = function(bucket, date_start = NULL, date_end = NULL) {
     tbl_hold <- tbl_hold[tbl_hold$TimeStamp %in% trunc_dt_vec, ]
     th <- merge_msl(tbl_hold, tbl_msl)
     tbl_hold <- th$inter
-    ix <- tbl_hold$SecType %in% c("sma")
+    ix <- tbl_hold$SecType %in% "sma"
     tbl_hold$DtcName[ix] <- paste0(tbl_hold$DtcName[ix], " Daily Est.")
     wgt <- tidyr::pivot_wider(
       data = tbl_hold,
@@ -152,6 +164,8 @@ ret_ctf_daily_adj = function() {
 # mutual funds ----
 
 #' @title Update index returns from Factset
+#' @param bucket S3 FileSystem created by create_bucket()
+#' @param api_keys list of credentials
 #' @param ids leave NULL to update all mutual funds, or enter specific
 #'   mutual fund, note if ids are entered they must be in the MSL
 #' @param days_back how many days to download
@@ -194,6 +208,8 @@ ret_mutual_fund = function(bucket, api_keys, ids = NULL, days_back = 1) {
 # etfs ----
 
 #' @title Update ETF returns from Factset
+#' @param bucket S3 FileSystem created by create_bucket()
+#' @param api_keys list of credentials
 #' @param ids leave `NULL` to udpate all ETFs in the Master Security List,
 #'   or enter a vector to only update specific ETFs
 #' @param date_start beginning date for update, if left `NULL` will

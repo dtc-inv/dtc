@@ -19,6 +19,10 @@ space_ids <- function(ids, max_ids = 50) {
   return(iter)
 }
 
+#' @title Clean CUSIPs in holdings tables
+#' @param tbl_hold data.frame with holdings
+#' @description CUSIPs with all zeros need to be read as NA
+#' @return tbl_hold with cleaned up CUSIPs
 #' @export
 clean_ids <- function(tbl_hold) {
   if ("Cusip" %in% colnames(tbl_hold)) {
@@ -30,6 +34,11 @@ clean_ids <- function(tbl_hold) {
   return(tbl_hold)
 }
 
+#' @title Find IDs in holdings table from multiple fields
+#' @description will look for DtcName, Ticker, Cusip, Sedol, Lei, and
+#'   Identifier fields to combine into an "IDs" vector
+#' @param tbl_hold data.frame with holdings
+#' @return vector of IDs
 #' @export
 get_ids <- function(tbl_hold) {
   tbl_hold <- clean_ids(tbl_hold)
@@ -49,6 +58,11 @@ get_ids <- function(tbl_hold) {
   return(ids)
 }
 
+#' @title Utility function to extract a named field from a list
+#'  while returning NA instead of NULL values for missing data
+#' @param x list
+#' @param nm vector of names (characters)
+#' @return values in list that correspond to the named field
 #' @export
 extract_list <- function(x, nm) {
   y <- lapply(x, '[[', nm)
@@ -56,13 +70,20 @@ extract_list <- function(x, nm) {
   unlist(y)
 }
 
+#' @title Utility function to replace NULL values in list with NA
+#' @param x list
 #' @export
 list_replace_null <- function(x) {
   x[sapply(x, is.null)] <- NA
   return(x)
 }
 
-
+#' @title Get IDs from multiple fields in Master Security List
+#' @description will search (in order): Isin, Sedol, Lei, Cusip, Ticker,
+#'   and Identifier. For use with Factset downloads requiring these types of
+#'   IDs.
+#' @param tbl_msl data.frame containing MSL
+#' @return vector of ids
 #' @export
 create_ids <- function(tbl_msl) {
   ids <- tbl_msl$Isin
@@ -74,6 +95,16 @@ create_ids <- function(tbl_msl) {
   return(ids)
 }
 
+#' @title Utility function to fill missing values
+#' @description Fills missing values of vector a with vector b, where a
+#'   and b are equal lengths with corresponding values, e.g., Tickers and
+#'   CUSIPS for the same securities
+#' @param a starting vector with potentially missing values
+#' @param b corresponding vector of the same length used to fill parts of a
+#'   that are missing values
+#' @return a with missing values filled by b
+#' @note if a and b are not the same length the function will return a as
+#' originally inputted
 #' @export
 fill_ix <- function(a, b) {
   if (length(a) == length(b)) {

@@ -7,6 +7,10 @@
 ret_mutual_fund(bucket, api_keys, ids = NULL, days_back = 1)
 }
 \arguments{
+\item{bucket}{S3 FileSystem created by create_bucket()}
+
+\item{api_keys}{list of credentials}
+
 \item{ids}{leave NULL to update all mutual funds, or enter specific
 mutual fund, note if ids are entered they must be in the MSL}
 

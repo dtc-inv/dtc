@@ -7,6 +7,8 @@
 ret_ctf_daily(bucket, date_start = NULL, date_end = NULL)
 }
 \arguments{
+\item{bucket}{S3 FileSystem created by create_bucket()}
+
 \item{date_start}{first date for return update, defaultt is two trading
 days prior to date_end}
 
@@ -18,5 +20,7 @@ no data returned, row binds new returns to database "ctf-daily"
   record
 }
 \description{
-Update CTF returns each day from Black Diamond bulk data
+Update CTF returns each day from Black Diamond batch data.
+  The holdings and transactions are needed to create the return estimates.
+  See hold_ctf_daily().
 }
