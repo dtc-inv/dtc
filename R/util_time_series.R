@@ -170,6 +170,8 @@ xts_rbind <- function(new, old, is_xts = TRUE, backfill = FALSE) {
     new_df <- new
     old_df <- old
   }
+  new_df$Date <- as.character(new_df$Date)
+  old_df$Date <- as.character(old_df$Date)
   new_ldf <- pivot_longer(new_df, cols = -Date, names_to = "name",
                           values_to = "value")
   old_ldf <- pivot_longer(old_df, cols = -Date, names_to = "name",
