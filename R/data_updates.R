@@ -14,9 +14,9 @@ hold_ctf_daily <- function(api_keys, as_of = NULL) {
   if (is.null(as_of)) {
     as_of <- last_us_trading_day()
   }
-  api_keys$bd_key <- refresh_bd_key(api_keys$bd_key, save_local = TRUE)
+  api_keys$bd_key <- refresh_bd_key(api_keys, save_local = TRUE)
   id <- download_bd_batch_id(api_keys, as_of)
-  Sys.sleep(120)
+  Sys.sleep(60)
   res <- download_bd_batch(api_keys, id$id)
   json <- unzip_bd_batch(res)
   handle_bd_batch(bucket, json, as_of)

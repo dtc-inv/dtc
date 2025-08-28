@@ -598,3 +598,41 @@ check_freq <- function(freq) {
     return(tolower(freq))
   }
 }
+
+#' @title Clean Returns by Column
+#' @description Handle missing returns in each column
+#'   without truncating to common periods for the return matrix. If the
+#'   % of missing values (once data starts in each column) is over the eps
+#'   the column will be removed, otherwise missing values will be replaced
+#'   with zeros.
+#' @param x return xts
+#' @param eps % of missing returns to tolerate, default is 0.05 for 5%
+#' @return list with $ret for cleaned returns and $miss for any columns
+#'   that had to be removed (if any)
+#' @export
+clean_by_col <- function(x, eps = 0.05) {
+  is_miss <- rep(NA, ncol(x))
+  for (i in 1:ncol(x)) {
+    cln <- na.omit(x[, i])
+    first_ret <- zoo::index(cln)[1]
+    last_ret <- zoo::index(cln)[length(cln)]
+    dt_rng <- paste0(first_ret, "/", last_ret)
+    is_miss[i] <- sum(is.na(x[dt_rng, i])) > (eps * length(x[dt_rng, i]))
+    if (!is_miss[i]) {
+      x_sub <- x[dt_rng, i]
+      x_sub[is.na(x_sub)] <- 0
+      x[dt_rng, i] <- x_sub
+    }
+  }
+  if (any(is_miss)) {
+    ret <- x[, !is_miss]
+    miss <- x[, is_miss]
+  } else {
+    ret <- x
+    miss <- NA
+  }
+  res <- list()
+  res$ret <- ret
+  res$miss <- miss
+  return(res)
+}

@@ -762,3 +762,118 @@ roll_style <- function(x, b, n) {
   colnames(res) <- colnames(obs)[-1]
   return(res)
 }
+
+
+
+
+#' @title Calculate Weighted Harmonic Mean
+#' @param w weight vector
+#' @param x data vector
+#' @export
+wgt_harmonic_mean <- function(w, x) {
+  sum(w, na.rm = TRUE) / sum(w / x, na.rm = TRUE)
+}
+
+#' @title Calculate Weighted Harmonic Mean of a Ratio in a data.frame
+#' @param tbl_hold data.frame
+#' @param x column name that contains the ratio
+#' @param w column name that contains the weights
+#' @details excludes missing and negative ratio and reconstitutes the weights
+#' @export
+calc_wgt_multiple <- function(tbl_hold, x = "PE", w = "CapWgt") {
+  miss <- is.na(tbl_hold[, x])
+  tbl_hold <- tbl_hold[!miss, ]
+  neg_earn <- tbl_hold[, x] < 0
+  tbl_hold <- tbl_hold[!neg_earn, ]
+  tbl_hold[, w] <- tbl_hold[, w] / sum(tbl_hold[, w], na.rm = TRUE)
+  wgt_harmonic_mean(tbl_hold[, w], tbl_hold[, x])
+}
+
+# port ----
+
+#' @title Cluster around latents
+#' @param cor_mat correlation matrix
+#' @export
+pca_hclust <- function(cor_mat) {
+  p <- princomp(covmat = cor_mat)
+  meas <- diag(p$sdev) %*% t(p$loadings[,])
+  dist_res <- dist(t(meas), method = 'euclidean')
+  hclust(dist_res)
+}
+
+
+#' @title Calculate risk cluster weights
+#' @param hc tree from hclust output
+#' @param vol volatility of assets used in hc calculation
+#' @param k number of clusters
+#' @export
+risk_cluster_wgt <- function(hc, vol, k = 2) {
+
+  n_assets <- max(hc$order)
+  memb <- cutree(hc, k)
+  xcor <- diag(1, n_assets, n_assets)
+  for (i in 1:k) {
+    xcor[memb == i, memb == i] <- 1
+  }
+  vol <- matrix(vol, ncol = 1)
+  xcov <- vol %*% t(vol) * xcor
+  mu_vec <- vol * 0.25
+  cov_inv <- MASS::ginv(xcov)
+  (cov_inv %*% mu_vec) /
+    (matrix(1, ncol = length(hc$order), nrow = 1) %*% cov_inv %*% mu_vec)[1]
+}
+
+
+# MC sim ----
+
+#' @export
+boot_strap <- function(x, n) {
+  is_vec <- is.null(dim(x))
+  if (is_vec) {
+    n_row <- length(x)
+  } else {
+    n_row <- nrow(x)
+  }
+  rand_row <- round(runif(n, 1, n_row), 0)
+  if (is_vec) {
+    return(x[rand_row])
+  } else {
+    return(x[rand_row, ])
+  }
+}
+
+
+#' @export
+block_boot_strap <- function(x, n, block) {
+  x <- as.vector(x)
+  boot_length <- ceiling(n / block)
+  boot_vec <- rep(NA, block * boot_length)
+  rand_row <- round(runif(boot_length, 0, length(x) - block + 1), 0)
+  j <- 1
+  for (i in 1:boot_length) {
+    rand_block <- rand_row[i]:(rand_row[i] + (block - 1))
+    boot_vec[j:(j + (block - 1))] <- x[rand_block]
+    j <- j + block
+  }
+  boot_vec[1:n]
+}
+
+
+
+# find n pcs ----
+
+#' @export
+sig_group_sim <- function(ret) {
+
+  xcor <- cor(ret)
+  lamda <- eigen(xcor)$values
+
+  noise_lamda <- matrix(nrow = 1000, ncol = length(lamda))
+  for (i in 1:1000) {
+    noise_ret <- apply(ret, 2, sample, size = nrow(ret), replace = FALSE)
+    noise_lamda[i, ] <- eigen(cor(noise_ret))$values
+  }
+  noise_95 <- apply(noise_lamda, 2, quantile, probs = 0.95)
+  return(sum(lamda > noise_95))
+}
+
