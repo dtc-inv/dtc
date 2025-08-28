@@ -642,6 +642,7 @@ ret_hfr_index = function(file_nm) {
 #' for example cash plus 200 bps reads the returns of cash, adds 200 bps,
 #' and then saves as a new data-field (return column)
 #' @return does not return data, updates various return records in the database
+#' @export
 ret_comp = function() {
   # cash plus 200 and 400 bps
   cash <- read_ret("BofAML U.S. Treasury Bill 3M", bucket)
