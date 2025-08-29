@@ -539,8 +539,8 @@ ret_model = function(bucket, api_keys, dtc_name = NULL, months_back = 1) {
     if (is.null(old)) {
       stop("could not read old daily model returns")
     }
-    combo <- xts_rbind(new, old, FALSE)
-    try_write(bucket, xts_to_dataframe(combo), "model-daily")
+    combo <- xts_rbind(new, old, FALSE, TRUE)
+    try_write(bucket, xts_to_dataframe(combo), "returns/model-daily.parquet")
   }
   m <- filter(model, ReturnLibrary == "model-monthly")
   m_id <- filter(msl, DtcName %in% m$DtcName)
@@ -563,8 +563,8 @@ ret_model = function(bucket, api_keys, dtc_name = NULL, months_back = 1) {
     if (is.null(old)) {
       stop("could not read monthly model old returns")
     }
-    combo <- xts_rbind(new, old, FALSE)
-    try_write(bucket, xts_to_dataframe(combo), "model-monthly")
+    combo <- xts_rbind(new, old, FALSE, TRUE)
+    try_write(bucket, xts_to_dataframe(combo), "returns/model-monthly.parquet")
   }
 }
 
@@ -707,5 +707,6 @@ ret_fred = function(bucket) {
   r <- xts_eo_month(r)
   try_write(bucket, xts_to_dataframe(r), "returns/fred-monthly.parquet")
 }
+
 
 
