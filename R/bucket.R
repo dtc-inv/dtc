@@ -113,6 +113,58 @@ read_ret <- function(ids, bucket, tbl_msl = NULL) {
   return(ret)
 }
 
+
+#' @title Read holdings
+#' @param ids vector of IDs, can be Ticker, Cusip, DtcName, or any ID field in
+#'   the MSL
+#' @param bucket S3FileSystem object
+#' @param tbl_msl data.frame representing master security list
+#' @return list with holdings files
+#' @export
+read_hold <- function(ids, bucket, tbl_msl = NULL) {
+  if (is.null(tbl_msl)) {
+    tbl_msl <- read_msl(bucket)
+  }
+  ids_dict <- filter(
+    tbl_msl,
+    DtcName %in% ids | Ticker %in% ids | Cusip %in% ids | Sedol %in% ids |
+      Lei %in% ids |  Identifier %in% ids
+  )
+  found <- ids %in% ids_dict$DtcName | ids %in% ids_dict$Ticker |
+    ids %in% ids_dict$Cusip | ids %in% ids_dict$Lei | ids %in% ids_dict$Lei |
+    ids %in% ids_dict$Identifier
+  if (all(!found)) {
+    warning("no ids found")
+    return(NULL)
+  }
+  if (any(!found)) {
+    warning(paste0(ids[!found], " not found in msl. "))
+  }
+  res <- list()
+  all_hold_files <- gsub("holdings/", "", bucket$ls("holdings/"))
+  all_hold_files <- gsub(".parquet", "", all_hold_files)
+  ix <- ids_dict$DtcName %in% all_hold_files
+  if (all(!ix)) {
+    stop("no holdings files for any of the ids")
+  }
+  if (any(!ix)) {
+    warning(paste0(ids_dict$DtcName[!ix], " not found in holdings files."))
+    ids_dict <- ids_dict[ix, ]
+  }
+  for (i in 1:nrow(ids_dict)) {
+    x <- try_read(bucket, paste0("holdings/", ids_dict$DtcName[i], ".parquet"))
+    if (is.null(x)) {
+      warning("bucket issue with reading holdings")
+      x <- data.frame()
+    }
+    res[[i]] <- x
+  }
+  names(res) <- ids_dict$DtcName
+  return(res)
+}
+
+
+
 temp_transfer <- function() {
   ac <- create_arctic(api_keys)
   lib <- get_all_lib(ac)

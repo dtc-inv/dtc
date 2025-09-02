@@ -574,7 +574,7 @@ ret_model = function(bucket, api_keys, dtc_name = NULL, months_back = 1) {
 #' @param ids optional parameter to only update certain stocks, leave NULL
 #'   to update all stocks in the MSL
 #' @param date_start starting date for new returns, default is NULL which
-#'   will find most recent date of existingg returns to start
+#'   will find most recent date of existing returns to start
 #' @param date_end most recent date for new returns, default is Sys.Date()
 #' @param freq "D" for daily
 #' @param geo "us" for US Stocks or "intl" for international stocks
@@ -706,6 +706,69 @@ ret_fred = function(bucket) {
   colnames(r) <- dtc_name
   r <- xts_eo_month(r)
   try_write(bucket, xts_to_dataframe(r), "returns/fred-monthly.parquet")
+}
+
+# holdings ----
+
+#' @title Download holdings from SEC EDGAR Database
+#' @param dtc_name leave `NULL` to download all, or enter a vector of
+#'   dtc_names to download specific funds
+#' @param user_email need to provide an email address to download
+#' @param save_to_db boolean to write to DTC's database, default is TRUE
+#' @param return_data boolean to return data.frame of holdings, default is FALSE
+hold_sec <- function(dtc_name = NULL,
+                    user_email = "asotolongo@diversifiedtrust.com",
+                    save_to_db = TRUE, return_data = FALSE) {
+
+  sec <- try_read(bucket, "meta-tables/tbl_sec.parquet")
+  if (!is.null(dtc_name)) {
+    sec <- filter(sec, DtcName %in% dtc_name)
+    if (nrow(sec) == 0) {
+      stop("dtc_names not found in SEC table")
+    }
+  } else {
+    dtc_name <- sec$DtcName
+  }
+  res <- list()
+  for (i in 1:length(dtc_name)) {
+    print(paste0("working on ", dtc_name[i]))
+    dat <- try(download_sec(sec$LongCIK[i], sec$ShortCIK[i], user_email))
+    if ("try-error" %in% class(dat)) {
+      warning(paste0("could not download ", dtc_name[i]))
+      next
+    }
+    if (save_to_db) {
+      dat$TimeStamp <- as.character(dat$TimeStamp)
+      if (dtc_name[i] %in% lib$list_symbols()) {
+        old_dat <- lib$read(dtc_name[i])
+        dup_date <- as.character(dat$TimeStamp[1]) %in%
+          unique(old_dat$data$TimeStamp)
+        if (dup_date) {
+          warning(paste0(dtc_name[i], " already has data for latest date"))
+          if (return_data) {
+            res[[i]] <- dat
+          }
+          next
+        }
+        combo <- rob_rbind(old_dat$data, dat)
+        lib$write(dtc_name[i], combo)
+      } else {
+        warning(
+          paste0(
+            dtc_name[i],
+            " not found in library, creating new symbol"
+          )
+        )
+        lib$write(dtc_name[i], dat)
+      }
+    }
+    if (return_data) {
+      res[[i]] <- dat
+    }
+  }
+  if (return_data) {
+    return(res)
+  }
 }
 
 

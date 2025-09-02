@@ -19,7 +19,7 @@ ret_stock(
 to update all stocks in the MSL}
 
 \item{date_start}{starting date for new returns, default is NULL which
-will find most recent date of existingg returns to start}
+will find most recent date of existing returns to start}
 
 \item{date_end}{most recent date for new returns, default is Sys.Date()}
 
