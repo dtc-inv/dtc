@@ -20,6 +20,7 @@ run_ppu <- function(bucket, as_of = NULL) {
   return(out)
 }
 
+#' @export
 run_ppu_monthly <- function(bucket, as_of = NULL) {
   if (is.null(as_of)) {
     as_of <- floor_date(Sys.Date(), "months") - 1
