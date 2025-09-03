@@ -129,7 +129,7 @@ tbl_cal_perf <- function(x, as_of = NULL, eom = FALSE) {
   perf <- list()
   for (i in 1:length(dt)) {
     perf[[i]] <- apply(x[paste0(dt[i], "/", as_of)] + 1, 2, prod)
-    if (i %in% 6:8) {
+    if (grepl("Yr", names(dt)[i])) {
       a <- as.numeric(gsub(" Yr", "", names(dt[i])))
       perf[[i]] <- perf[[i]]^(1/a) - 1
     } else {

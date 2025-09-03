@@ -399,8 +399,8 @@ ret_ctf_monthly <- function(bucket, xl_path = NULL, skip = 4) {
   )
   x <- dat[, tgt]
   colnames(x)<- c(
-    "Private Diversifiers",
     "Private Diversifiers II",
+    "Private Diversifiers",
     "Short Duration",
     "Magnitude Capital",
     "Turion",
