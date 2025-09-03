@@ -20,8 +20,27 @@ run_ppu <- function(bucket, as_of = NULL) {
   return(out)
 }
 
+run_ppu_monthly <- function(bucket, as_of = NULL) {
+  if (is.null(as_of)) {
+    as_of <- floor_date(Sys.Date(), "months") - 1
+  }
+  ppu_tbl <- try_read(bucket, "meta-tables/ppu-monthly.parquet")
+  r <- read_ret(ppu_tbl$DtcName, bucket)
+  r <- cut_time(r, date_end = as_of)
+  tbl_name <- unique(ppu_tbl$Table)
+  res <- list()
+  for (i in 1:length(tbl_name)) {
+    res[[i]] <- ppu_sect(ppu_tbl, r, as_of, tbl_name[i], eom = TRUE)
+  }
+  names(res) <- tbl_name
+  out <- list()
+  out$res <- res
+  out$date_end <- zoo::index(r)[nrow(r)]
+  return(out)
+}
+
 #' @export
-ppu_sect <- function(ppu_tbl, r, as_of, tbl_name = NULL) {
+ppu_sect <- function(ppu_tbl, r, as_of, tbl_name = NULL, eom = FALSE) {
   if (!is.null(tbl_name)) {
     ppu_x <- ppu_tbl[ppu_tbl$Table %in% tbl_name, ]
   } else {
@@ -34,7 +53,7 @@ ppu_sect <- function(ppu_tbl, r, as_of, tbl_name = NULL) {
     ppu_x <- ppu_x[ppu_x$DtcName %in% colnames(x$ret), ]
   }
   x <- x$ret
-  perf <- tbl_cal_perf(x, as_of)
+  perf <- tbl_cal_perf(x, as_of, eom)
   perf$Name <- gsub(" Daily Est.", "", perf$Name)
   yrs <- xts_to_dataframe(change_freq(x, "years"))
   yrs <- yrs[order(yrs$Date, decreasing = TRUE), ]
