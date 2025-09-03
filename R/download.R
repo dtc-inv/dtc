@@ -813,6 +813,20 @@ read_hfr_csv <- function(file_nm) {
 }
 
 
+read_pdf_mgr <- function(file_nm = NULL, sht = NULL, skip = NULL) {
+  if (is.null(file_nm)) {
+    file_nm <- "N:/Investment Team/CTFs/Private Diversifiers/PDF Workup 2.xlsm"
+  }
+  if (is.null(sht)) {
+    sht <- "ret"
+  }
+  if (is.null(skip)) {
+    skip <- 0
+  }
+  x <- read_xts(file_nm, sht, skip = 0)
+}
+
+
 read_daily_ctf_xl <- function(nm) {
   fnm <- paste0("N:/Investment Team/DATABASES/CustomRet/ctf-daily-backfill/",
                 nm, ".csv")

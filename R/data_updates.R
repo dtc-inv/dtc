@@ -397,21 +397,28 @@ ret_ctf_monthly <- function(bucket, xl_path = NULL, skip = 4) {
     "Winston Global Fund, L.P. (Net)",
     "Winston Hedged Equity Fund, L.P. (Net)"
   )
-  x <- dat[, tgt[1:3]]
+  x <- dat[, tgt]
   colnames(x)<- c(
     "Private Diversifiers",
     "Private Diversifiers II",
-    "Short Duration"
+    "Short Duration",
+    "Magnitude Capital",
+    "Turion",
+    "Granville Multi-Strategy",
+    "Granville Equity",
+    "Winston Global",
+    "Winston Hedged Equity"
   )
   r <- xts_cbind(r, x)
   r <- r["1994/"] / 100
-  old_ret <- try_read(bucket, "returns/ctf.parquet")
-  if (is.null(old_ret)) {
-    stop("could not load ctf old ret")
-  }
-  combo <- xts_rbind(xts_to_dataframe(r),
-                     old_ret,is_xts = FALSE, backfill = TRUE)
-  try_write(bucket, xts_to_dataframe(combo), "returns/ctf.parquet")
+  # old_ret <- try_read(bucket, "returns/ctf.parquet")
+  # if (is.null(old_ret)) {
+  #   stop("could not load ctf old ret")
+  # }
+  # combo <- xts_rbind(xts_to_dataframe(r),
+  #                    old_ret,is_xts = FALSE, backfill = TRUE)
+  combo <- xts_to_dataframe(r)
+  try_write(bucket, combo, "returns/ctf.parquet")
 }
 
 # workup ----
