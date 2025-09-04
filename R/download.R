@@ -844,27 +844,30 @@ read_daily_ctf_xl <- function(nm) {
   return(out)
 }
 
+#' @title Read Private Cash Flows from Excel
+#' @export
 pvt_cf <- function(wb, cf_sht = "cf", nav_sht = "nav") {
   cf <- read_xts(wb, cf_sht)
   nav <- read_xts(wb, nav_sht)
   inter <- intersect(colnames(cf), colnames(nav))
   nav <- nav[, inter]
   cf <- cf[, inter]
-  res <- list()
+  twr_l <- list()
+  tvpi <- rep(NA, ncol(nav))
   for (i in 1:ncol(nav)) {
     ix <- paste0(zoo::index(na.omit(cf[, i]))[1], "/")
-    combo <- clean_ret(cbind(cf[ix, i], nav[ix, i]), trunc_start = FALSE, eps = 1)
+    combo <- clean_ret(cbind(cf[ix, i], nav[ix, i]), trunc_start = FALSE,
+                       eps = 1)
     q <- combo$ret[, 2]
     q <- q[q!= 0, ]
     twr <- q
     twr[,] <- NA
     cfi <- combo$ret[, 1]
-    #cfj <- cut_time(cfi, date_end = zoo::index(q)[1])
     cfj <- cfi[paste0("/", zoo::index(q)[1])]
-    w <- wgt_month(zoo::index(q)[1], zoo::index(cfj))
+    #w <- wgt_month(zoo::index(q)[1], zoo::index(cfj))
+    w <- 1
     twr[1] <- (as.numeric(q[1]) + sum(cfj)) / -sum(cfj * w)
     for (j in 2:nrow(q)) {
-      #cfj <- cut_time(cfi, date_start = zoo::index(q)[j-1]+1, zoo::index(q)[j])
       date_start <- zoo::index(q)[j-1]+1
       date_end <- zoo::index(q)[j]
       cfj <- cfi[paste0(date_start, "/", date_end)]
@@ -873,8 +876,23 @@ pvt_cf <- function(wb, cf_sht = "cf", nav_sht = "nav") {
       w <- wgt_month(zoo::index(q)[j], zoo::index(cfj))
       twr[j] <- (v1 - v0 + sum(cfj)) / (v0 - sum(cfj * w))
     }
-    res[[i]] <- twr
+    twr_l[[i]] <- twr
+    is_contr <- combo$ret[, 1] < 0
+    is_distr <- combo$ret[, 1] > 0
+    last_nav <- q[nrow(q)]
+    tvpi[i] <- sum(combo$ret[is_distr, 1], last_nav) /
+      -sum(combo$ret[is_contr, 1])
   }
+  r <- do.call(cbind, twr_l)
+  colnames(r) <- inter
+  res <- list()
+  res$twr <- r
+  res$tvpi <- tvpi
+  return(res)
+}
+
+twr_on_tvpi <- function(res) {
+
 }
 
 #' @export
