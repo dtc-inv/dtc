@@ -28,8 +28,9 @@ run_ppu_monthly <- function(bucket, as_of = NULL) {
   ppu_tbl <- try_read(bucket, "meta-tables/ppu-monthly.parquet")
   r <- read_ret(ppu_tbl$DtcName, bucket)
   r <- cut_time(r, date_end = as_of)
-  if (zoo::index(r)[nrow(r)] < as_of) {
-    as_of <- zoo::index(r)[nrow(r)]
+  dt_info <- ret_date_info(r)
+  if (min(dt_info$End) < as_of) {
+    as_of <- min(dt_info$End)
   }
   tbl_name <- unique(ppu_tbl$Table)
   res <- list()
