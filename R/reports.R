@@ -188,3 +188,13 @@ eom_cal_perf_dt <- function(as_of = NULL, eom = TRUE) {
     return(dt)
   }
 }
+
+port_from_xl <- function(wb, sht, bucket, asset_freq = "D",
+                         rebal_freq = "M", nm = "Port") {
+  wgt <- read_xts(wb, sht)
+  r <- read_ret(colnames(wgt), bucket)
+  r[is.na(r)] <- 0
+  p <- Rebal$new(wgt, r, asset_freq, rebal_freq, nm)
+  p$rebal()
+  return(p)
+}

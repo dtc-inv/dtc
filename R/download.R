@@ -845,8 +845,15 @@ read_daily_ctf_xl <- function(nm) {
 }
 
 #' @title Read Private Cash Flows from Excel
+#' @param wb workbook with cash flows and NAVs
+#' @param cf_sht name of worksheet with cash flows
+#' @param nav_sht name of worksheet with NAVs
+#' @param unsmooth optional paramter to specify whether to unsmooth the
+#'   returns or not
+#' @return list with twr = time weighted returns xts and tvpi = vector of
+#'   multiples
 #' @export
-pvt_cf <- function(wb, cf_sht = "cf", nav_sht = "nav") {
+pvt_cf <- function(wb, cf_sht = "cf", nav_sht = "nav", unsmooth = TRUE) {
   cf <- read_xts(wb, cf_sht)
   nav <- read_xts(wb, nav_sht)
   inter <- intersect(colnames(cf), colnames(nav))
@@ -885,14 +892,85 @@ pvt_cf <- function(wb, cf_sht = "cf", nav_sht = "nav") {
   }
   r <- do.call(cbind, twr_l)
   colnames(r) <- inter
+  if (unsmooth) {
+    for (i in 1:ncol(r)) {
+      x <- na.omit(r[, i])
+      p <- pacf(x, 1, plot = FALSE)
+      rho <- as.numeric(p$acf)
+      lag_1 <- lag.xts(x, 1)
+      x_adj <- (x - lag_1 * rho) / (1 - rho)
+      ix <- zoo::index(r) %in% zoo::index(na.omit(x_adj))
+      r[ix, i] <- na.omit(x_adj)
+    }
+  }
   res <- list()
   res$twr <- r
   res$tvpi <- tvpi
   return(res)
 }
 
+#' @title Match Product of TWR to TVPI
+#' @param res output of `pvt_cf()` function
+#' @return res input list with twr_adj added to represent adjusted time
+#'   weighted returns that equal the TVPI multiple
+#' @export
 twr_on_tvpi <- function(res) {
+  res$twr_adj <- res$twr
+  for (i in 1:ncol(res$twr)) {
+    twx <- na.omit(res$twr[, i])
+    res$tvpi[i]
+    lx <- -0.9
+    ux <- 0.95
+    for (j in 1:1000) {
+      mx <- (lx + ux) / 2
+      if (abs(prod(1 + twx + mx) - res$tvpi[i]) < 0.0001) {
+        break
+      }
+      if (prod(1 + twx + mx) - res$tvpi[i] > 0) {
+        ux <- mx
+      } else {
+        lx <- mx
+      }
+    }
+    twx <- twx + mx
+    ix <- zoo::index(res$twr_adj) %in% zoo::index(twx)
+    res$twr_adj[ix, i] <- twx
+  }
+  return(res)
+}
 
+#' @title Put Monthly Public Indexes in Quarterly Private Returns
+#' @param bucket s3 filesystem
+#' @param res from `twr_on_tvpi()` function
+#' @return xts with monthly returns
+#' @export
+pvt_cf_to_monthly <- function(bucket, res) {
+  if (is.null(res$twr_adj)) {
+    stop("need to run twr_on_tvpi first")
+  }
+  pc <- try_read(bucket, "meta-tables/public-comp.parquet")
+  r <- list()
+  for (i in 1:nrow(pc)) {
+    ix <- colnames(res$twr_adj) %in% pc$DtcName[i]
+    if (all(!ix)) {
+      warning(pc$DtcName[i])
+      next
+    }
+    if (sum(ix) > 1) {
+      warning(pc$DtcName[i])
+      next
+    }
+    q <- na.omit(res$twr_adj[, ix])
+    pub <- read_ret(pc$PublicComp[i], bucket)
+    pub <- change_freq(pub, "months")
+    m <- monthly_spline(pub, q)
+    m <- m[paste0(zoo::index(q)[1], "/")]
+    colnames(m) <- pc$DtcName[i]
+    r[[i]] <- m
+  }
+  twr <- do.call(cbind, r)
+  colnames(twr) <- sapply(r, colnames)
+  return(twr)
 }
 
 #' @export
