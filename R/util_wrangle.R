@@ -450,3 +450,9 @@ wgt_cf <- function(cf) {
   return(x)
 }
 
+#' @export
+force_date <- function(x) {
+  dt <- as.Date(x)
+  dt[is.na(dt)] <- as.Date(as.numeric(x[is.na(dt)]))
+  return(dt)
+}
