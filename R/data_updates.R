@@ -723,11 +723,11 @@ ret_fred = function(bucket) {
 #' @param user_email need to provide an email address to download
 #' @param save_to_db boolean to write to DTC's database, default is TRUE
 #' @param return_data boolean to return data.frame of holdings, default is FALSE
-hold_sec <- function(dtc_name = NULL,
-                    user_email = "asotolongo@diversifiedtrust.com",
-                    save_to_db = TRUE, return_data = FALSE) {
+hold_sec <- function(bucket, dtc_name = NULL,
+                     user_email = "asotolongo@diversifiedtrust.com",
+                     save_to_db = TRUE, return_data = FALSE) {
 
-  sec <- try_read(bucket, "meta-tables/tbl_sec.parquet")
+  sec <- try_read(bucket, "meta-tables/sec.parquet")
   if (!is.null(dtc_name)) {
     sec <- filter(sec, DtcName %in% dtc_name)
     if (nrow(sec) == 0) {
@@ -745,11 +745,16 @@ hold_sec <- function(dtc_name = NULL,
       next
     }
     if (save_to_db) {
-      dat$TimeStamp <- as.character(dat$TimeStamp)
-      if (dtc_name[i] %in% lib$list_symbols()) {
-        old_dat <- lib$read(dtc_name[i])
-        dup_date <- as.character(dat$TimeStamp[1]) %in%
-          unique(old_dat$data$TimeStamp)
+      if (paste0("holdings/", dtc_name[i], ".parquet") %in%
+          bucket$ls("holdings/")) {
+        old_dat <- try_read(bucket, paste0("holdings/", dtc_name[i],
+                                           ".parquet"))
+        if (is.null(old_dat)) {
+          warning("could not read old data")
+          next
+        }
+        dup_date <- dat$TimeStamp[1] %in%
+          unique(old_dat$TimeStamp)
         if (dup_date) {
           warning(paste0(dtc_name[i], " already has data for latest date"))
           if (return_data) {
@@ -757,8 +762,8 @@ hold_sec <- function(dtc_name = NULL,
           }
           next
         }
-        combo <- rob_rbind(old_dat$data, dat)
-        lib$write(dtc_name[i], combo)
+        combo <- rob_rbind(old_dat, dat)
+        try_write(bucket, combo, paste0("holdings/", dtc_name[i], ".parquet"))
       } else {
         warning(
           paste0(
@@ -778,5 +783,68 @@ hold_sec <- function(dtc_name = NULL,
   }
 }
 
+# fundamental data
 
+#' @title Download equity financial data
+#' @param api_keys list with api keys
+#' @param bucket s3 filesystem
+#' @param ids leave `NULL` to get for all stocks, or enter specific ids
+#' @param yrs_back how many years of data to pull
+#' @param dtype data type: one of PE, PB, PFCF, DY, ROE, and MCAP
+#' @return does not return data, updates database with fundamental data
+#' @seealso \code{\link{download_fs_formula}}
+#' @export
+co_fundamental_data = function(api_keys, bucket, ids = NULL, yrs_back = 1,
+    dtype = c('PE', 'PB', 'PFCF', 'DY', 'ROE', 'MCAP')) {
 
+  dtype <- dtype[1]
+  if (dtype == 'PE') {
+    formulas <- paste0('FG_PE(-', yrs_back, 'AY,NOW,CQ)')
+  } else if (dtype == 'PB') {
+    formulas <- paste0('FG_PBK(-', yrs_back, 'AY,NOW,CQ)')
+  } else if (dtype == 'PFCF') {
+    formulas <- paste0('FG_CFLOW_FREE_EQ_PS(-', yrs_back, 'AY,NOW,CQ,USD)')
+  } else if (dtype == 'DY') {
+    formulas <- paste0('FG_DIV_YLD(-', yrs_back, 'AY,NOW,CQ)')
+  } else if (dtype == 'ROE') {
+    formulas <- paste0('FG_ROE(-', yrs_back, 'AY,NOW,CQ)')
+  } else if (dtype == 'MCAP') {
+    formulas <- paste0('FF_MKT_VAL(ANN_R,-', yrs_back, 'AY,NOW,CQ,,USD)')
+  } else {
+    stop("dtype must be 'PE', 'PB', 'PFCF', 'DY', 'ROE', or 'MCAP'")
+  }
+  tbl_msl <-read_msl(bucket)
+  if (is.null(ids)) {
+    stock <- filter(tbl_msl, SecType == "us-stock" | SecType == "intl-stock")
+    ids <- create_ids(stock)
+  } else {
+    ix <- match_ids_dtc_name(ids, tbl_msl)
+    if (any(is.na(ix))) {
+      stop("ids missing from MSL")
+    }
+  }
+  ids <- gsub(" ", "", ids)
+  iter <- space_ids(ids)
+  xdf <- data.frame()
+  for (i in 1:(length(iter)-1)) {
+    json <- download_fs_formula(api_keys, ids[iter[i]:iter[i+1]],
+                                formulas)
+    xdf <- rbind(xdf, flatten_fs_formula(json))
+    print(iter[i])
+  }
+  ix <- match_ids_dtc_name(xdf$requestId, tbl_msl)
+  dtc_name <- tbl_msl$DtcName[ix]
+  xdf$DtcName <- dtc_name
+  is_dup <- duplicated(paste0(xdf$DtcName, xdf$date))
+  xdf <- xdf[!is_dup, ]
+  colnames(xdf)[2:3] <- c(dtype, "Date")
+  wdf <- pivot_wider(xdf, id_cols = Date, names_from = DtcName,
+                     values_from = all_of(dtype))
+  old_data <- try_read(bucket, paste0("co-data/", dtype, ".parquet"))
+  if (is.null(old_data)) {
+    stop("could not read old data")
+  }
+  combo <- xts_rbind(wdf, old_data, FALSE)
+  combo_df <- xts_to_dataframe(combo)
+  try_write(bucket, combo_df, paste0("co-data/", dtype, ".parquet"))
+}

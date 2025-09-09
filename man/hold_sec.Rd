@@ -5,6 +5,7 @@
 \title{Download holdings from SEC EDGAR Database}
 \usage{
 hold_sec(
+  bucket,
   dtc_name = NULL,
   user_email = "asotolongo@diversifiedtrust.com",
   save_to_db = TRUE,
