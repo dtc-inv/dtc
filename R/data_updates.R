@@ -848,3 +848,82 @@ co_fundamental_data = function(api_keys, bucket, ids = NULL, yrs_back = 1,
   combo_df <- xts_to_dataframe(combo)
   try_write(bucket, combo_df, paste0("co-data/", dtype, ".parquet"))
 }
+
+#' @export
+download_sectors = function(bucket, api_keys, ids = NULL) {
+  tbl_msl <- read_msl(bucket)
+  if (is.null(ids)) {
+    stock <- filter(tbl_msl, ReturnLibrary == "us-stock" |
+                      ReturnLibrary == "intl-stock")
+    ids <- stock$Isin
+  } else {
+    ix <- match_ids_dtc_name(ids, tbl_msl)
+    if (any(is.na(ix))) {
+      stop("ids missing from MSL")
+    }
+  }
+  ids[is.na(ids)] <- stock$Cusip[is.na(ids)]
+  ids <- gsub(" ", "", ids)
+  ids <- na.omit(ids)
+  iter <- space_ids(ids)
+  xformula <- "FG_FACTSET_SECTOR"
+  xdf <- data.frame()
+  for (i in 1:(length(iter)-1)) {
+    json <- download_fs_formula(
+      api_keys = api_keys,
+      ids = ids[iter[i]:iter[i+1]],
+      formulas = xformula
+    )
+    xdf <- rbind(xdf, flatten_fs_formula(json))
+  }
+  colnames(xdf) <- c("RequestId", "FactsetSector")
+  is_dup <- duplicated(xdf$RequestId)
+  xdf <- xdf[!is_dup, ]
+  ix <- match(xdf$RequestId, stock$Isin)
+  ix[is.na(ix)] <- match(xdf$RequestId, stock$Cusip)[is.na(ix)]
+  xdf$DtcName <- stock$DtcName[ix]
+  r3 <- try_read(bucket, "co-data/macro_sel_r3.parquet")
+  # TO-DO add ACWI
+  r3 <- rename(r3, Isin = ISIN)
+  res <- left_merge(r3, tbl_msl, c("Ticker", "Isin"))
+  res <- left_merge(xdf, res$inter, "DtcName")
+  sect <- res$union[, c("RequestId", "FactsetSector", "DtcName", "Sector")]
+  sect <- rename(sect, GicsMacro = Sector)
+  sect_map <- try_read(bucket, "meta-tables/sector-map.parquet")
+  res <- left_merge(sect, sect_map, c("FactsetSector"))
+  try_write(bucket, res$union, "co-data/sector.parquet")
+}
+
+
+#' @title Download Macro Select Workbook and Save to Library
+#' @param bucket s3 file system
+#' @param wb file location of workbook
+#' @param is_us TRUE for Russell 3000, FALSE for MSCI ACWI
+#' @export
+update_ps_macro_select = function(bucket, wb, is_us = TRUE) {
+  if (is_us) {
+    idx_nm <- "Russell 3000"
+  } else {
+    idx_nm <- "MSCI ACWI"
+  }
+  dat <- read_macro_wb(wb, idx_nm)
+  bad_row <- rowSums(is.na(dat)) == ncol(dat)
+  dat <- dat[!bad_row, ]
+  if (is_us) {
+    try_write(bucket, dat, "co-data/macro_sel_r3.parquet")
+  } else {
+    try_write(bucket, dat, "co-data/macro_sel_acwi.parquet")
+  }
+}
+
+#' @export
+read_macro_wb <- function (wb, idx_nm) {
+  menu <- readxl::read_excel(wb, "menu")
+  menu <- as.data.frame(menu)
+  col_off <- menu[menu[, 2] == idx_nm, 3]
+  col_off <- na.omit(col_off)
+  dat <- readxl::read_excel(wb, "data", skip = 4)
+  model <- dat[, c(1:7, (col_off - 1):(col_off + 3))]
+  model <- as.data.frame(model)
+  return(model)
+}
