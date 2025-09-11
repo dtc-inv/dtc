@@ -853,8 +853,8 @@ co_fundamental_data = function(api_keys, bucket, ids = NULL, yrs_back = 1,
 download_sectors = function(bucket, api_keys, ids = NULL) {
   tbl_msl <- read_msl(bucket)
   if (is.null(ids)) {
-    stock <- filter(tbl_msl, ReturnLibrary == "us-stock" |
-                      ReturnLibrary == "intl-stock")
+    stock <- filter(tbl_msl, SecType == "us-stock" |
+                      SecType == "intl-stock")
     ids <- stock$Isin
   } else {
     ix <- match_ids_dtc_name(ids, tbl_msl)
@@ -926,4 +926,30 @@ read_macro_wb <- function (wb, idx_nm) {
   model <- dat[, c(1:7, (col_off - 1):(col_off + 3))]
   model <- as.data.frame(model)
   return(model)
+}
+
+#' @export
+latest_fina <- function(bucket) {
+  pe <- try_read(bucket, "co-data/PE.parquet")
+  pb <- try_read(bucket, "co-data/PB.parquet")
+  pfcf <- try_read(bucket, "co-data/PFCF.parquet")
+  dy <- try_read(bucket, "co-data/DY.parquet")
+
+  pe <- data.frame(DtcName = colnames(pe)[-1],
+                   PE = as.numeric(pe[nrow(pe), -1]))
+
+  pb <- data.frame(DtcName = colnames(pb)[-1],
+                   PB = as.numeric(pb[nrow(pb), -1]))
+
+  pfcf <- data.frame(DtcName = colnames(pfcf)[-1],
+                     PFCF = as.numeric(pfcf[nrow(pfcf), -1]))
+
+  dy <- data.frame(DtcName = colnames(dy)[-1],
+                   DY = as.numeric(dy[nrow(dy), -1]))
+
+  xdf <- left_merge(pe, pb, "DtcName")
+  xdf <- left_merge(xdf, pfcf, "DtcName")
+  xdf <- left_merge(xdf, dy, "DtcName")
+
+
 }

@@ -456,3 +456,22 @@ force_date <- function(x) {
   dt[is.na(dt)] <- as.Date(as.numeric(x[is.na(dt)]))
   return(dt)
 }
+
+#' @export
+ids_to_dtcname <- function(ids, bucket, tbl_msl = NULL) {
+  if (is.null(tbl_msl)) {
+    tbl_msl <- read_msl(bucket)
+  }
+  ids[is.na(ids)] <- "NA"
+  ids_dict <- filter(
+    tbl_msl,
+    DtcName %in% ids | Ticker %in% ids | Cusip %in% ids | Sedol %in% ids |
+      Lei %in% ids |  Identifier %in% ids
+  )
+  found <- ids %in% ids_dict$DtcName | ids %in% ids_dict$Ticker |
+    ids %in% ids_dict$Cusip | ids %in% ids_dict$Lei | ids %in% ids_dict$Lei |
+    ids %in% ids_dict$Identifier
+  dtc_name <- rep(NA, length(ids))
+  dtc_name[found] <- ids_dict$DtcName
+  return(dtc_name)
+}

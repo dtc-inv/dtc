@@ -29,14 +29,17 @@ check_msl_fields <- function(x) {
 #' @return tbl_hold with most recent holdings
 #' @export
 latest_holdings <- function(tbl_hold) {
-  is_char <- "character" %in% class(tbl_hold$TimeStamp)
-  if (is_char) {
-    tbl_hold$TimeStamp <- as.Date(tbl_hold$TimeStamp)
+  if (!"TimeStamp" %in% colnames(tbl_hold)) {
+    warning("no TimeStamp found")
+    return(tbl_hold)
   }
+  if (all(is.na(tbl_hold$TimeStamp))) {
+    warning("all TimeStamp observations are missing")
+    return(tbl_hold)
+  }
+  tbl_hold$TimeStamp <- force_date(tbl_hold$TimeStamp)
   is_latest <- tbl_hold$TimeStamp == max(tbl_hold$TimeStamp)
-  if (is_char) {
-    tbl_hold$TimeStamp <- as.character(tbl_hold$TimeStamp)
-  }
+  tbl_hold[is_latest, ]
   tbl_hold[is_latest, ]
 }
 

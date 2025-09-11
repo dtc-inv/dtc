@@ -163,6 +163,40 @@ read_hold <- function(ids, bucket, tbl_msl = NULL) {
   return(res)
 }
 
+read_fina_hist <- function(ids, bucket, dtype = "PE", tbl_msl = NULL) {
+  if (is.null(tbl_msl)) {
+    tbl_msl <- read_msl(bucket)
+  }
+  ids_dict <- filter(
+    tbl_msl,
+    DtcName %in% ids | Ticker %in% ids | Cusip %in% ids | Sedol %in% ids |
+      Lei %in% ids |  Identifier %in% ids
+  )
+  found <- ids %in% ids_dict$DtcName | ids %in% ids_dict$Ticker |
+    ids %in% ids_dict$Cusip | ids %in% ids_dict$Lei | ids %in% ids_dict$Lei |
+    ids %in% ids_dict$Identifier
+  if (all(!found)) {
+    warning("no ids found")
+    return(NULL)
+  }
+  if (any(!found)) {
+    warning(paste0(ids[!found], " not found in msl. "))
+    ids_dict <- ids_dict[ix, ]
+  }
+  is_stock <- ids_dict$SecType == "us-stock" |
+    ids_dict$SecType == "intl-stock"
+  if (all(!is_stock)) {
+    warning("no stock ids found")
+    return(NULL)
+  }
+  if (any(!is_stock)) {
+    warning(paste0(ids_dict[!is_stock, ]$DtcName, " is not a stock"))
+    ids_dict <- ids_dict[is_stock, ]
+  }
+
+
+
+}
 
 
 temp_transfer <- function() {
