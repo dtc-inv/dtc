@@ -948,8 +948,16 @@ latest_fina <- function(bucket) {
                    DY = as.numeric(dy[nrow(dy), -1]))
 
   xdf <- left_merge(pe, pb, "DtcName")
-  xdf <- left_merge(xdf, pfcf, "DtcName")
-  xdf <- left_merge(xdf, dy, "DtcName")
+  xdf <- left_merge(xdf$union, pfcf, "DtcName")
+  xdf <- left_merge(xdf$union, dy, "DtcName")
+  return(xdf$union)
+}
 
-
+rm_dup_holdings <- function(bucket) {
+  files <- bucket$ls("holdings/")
+  for (i in 1:length(files)) {
+    x <- try_read(bucket, files[i])
+    x <- remove_dup_dates(x)
+    try_write(bucket, x, files[i])
+  }
 }
