@@ -475,3 +475,40 @@ ids_to_dtcname <- function(ids, bucket, tbl_msl = NULL) {
   dtc_name[found] <- ids_dict$DtcName
   return(dtc_name)
 }
+
+#' @title Row bind columns with different headers
+#' @param df_list list of data.frames to rowbind
+#' @export
+bind_rows_with_na <- function(df_list) {
+  # Extract all unique column names across all dataframes
+  all_cols <- unique(unlist(lapply(df_list, names)))
+
+  # If no columns exist in any dataframe, return empty data.frame
+  if (length(all_cols) == 0) {
+    return(data.frame())
+  }
+
+  # Standardize each dataframe to have all columns, filling missing ones with NA
+  standardized_list <- lapply(df_list, function(df) {
+    # If df has zero columns, create empty df with correct column names
+    if (nrow(df) == 0) {
+      df <- as.data.frame(matrix(ncol = length(all_cols), nrow = 0))
+      names(df) <- all_cols
+      return(df)
+    }
+
+    # Add missing columns with NA
+    missing_cols <- setdiff(all_cols, names(df))
+    for (col in missing_cols) {
+      df[[col]] <- NA
+    }
+
+    # Reorder columns to match the full set
+    df <- df[all_cols]
+    return(df)
+  })
+
+  # Row bind all standardized dataframes
+  result <- do.call(rbind, standardized_list)
+  return(result)
+}

@@ -101,69 +101,45 @@ latest_holdings <- function(tbl_hold) {
 #   return(res)
 # }
 
+
 drill_down <- function(bucket, tbl_hold) {
   tbl_msl <- read_msl(bucket)
   tbl_hold <- latest_holdings(tbl_hold)
   top_layer_res <- merge_msl(tbl_hold, tbl_msl)
-  tbl_hold <- top_layer_res$inter
   res <- list()
+  res[[1]] <- list(top_layer_res)
+  names(res[[1]]) <- "Top"
   for (i in 1:10) {
-    tbl_hold$Layer[is.na(tbl_hold$Layer)] <- 1
-    if (all(tbl_hold$Layer == 1)) {
+    layer <- sapply(res[[i]], \(x) {x$inter$Layer}) |>
+      as.vector()
+    if (inherits(layer, "list")) {
+      layer <- unlist(layer)
+    }
+    layer[is.na(layer)] <- 1
+    if (all(layer == 1)) {
       break
     }
-    ix <- tbl_hold$Layer > 1
-    u_hold <- read_hold(tbl_hold$DtcName[ix], bucket)
-    u_hold <- lapply(u_hold, latest_holdings)
-    for (j in 1:length(u_hold)) {
-      u_hold[[j]][[paste0("Parent", i)]] <- names(u_hold)[j]
+    u_hold <- list()
+    for (j in 1:length(res[[i]])) {
+      ix <- res[[i]][[j]]$inter$Layer > 1
+      ix[is.na(ix)] <- FALSE
+      if (sum(ix) == 0) {
+        next
+      }
+      u_hold_j <- read_hold(res[[i]][[j]]$inter$DtcName[ix], bucket)
+      u_hold_j <- lapply(u_hold_j, latest_holdings)
+      u_hold_j <- lapply(u_hold_j, merge_msl, tbl_msl = tbl_msl,
+                         rm_dup_dates = FALSE)
+      u_hold <- c(u_hold, u_hold_j)
     }
-    nm_ix <- match(names(u_hold), tbl_hold$DtcName)
-    wgt_vec <- tbl_hold$CapWgt[nm_ix]
-    u_hold_adj <- mapply(
-      \(x, w) {
-        x$CapWgt <- x$CapWgt * w
-        return(x)},
-      x = u_hold, w = wgt_vec, SIMPLIFY = FALSE)
-    u_hold_adj <- bind_rows_with_na(u_hold_adj)
-    tbl_hold <- bind_rows_with_na(list(tbl_hold[!ix, ], u_hold_adj))
-    res[[i]] <- merge_msl(tbl_hold, tbl_msl, FALSE)
-    tbl_hold <- res[[i]]$inter
+    res[[i+1]] <- u_hold
   }
+  return(res)
 }
 
-bind_rows_with_na <- function(df_list) {
-  # Extract all unique column names across all dataframes
-  all_cols <- unique(unlist(lapply(df_list, names)))
 
-  # If no columns exist in any dataframe, return empty data.frame
-  if (length(all_cols) == 0) {
-    return(data.frame())
-  }
 
-  # Standardize each dataframe to have all columns, filling missing ones with NA
-  standardized_list <- lapply(df_list, function(df) {
-    # If df has zero columns, create empty df with correct column names
-    if (nrow(df) == 0) {
-      df <- as.data.frame(matrix(ncol = length(all_cols), nrow = 0))
-      names(df) <- all_cols
-      return(df)
-    }
 
-    # Add missing columns with NA
-    missing_cols <- setdiff(all_cols, names(df))
-    for (col in missing_cols) {
-      df[[col]] <- NA
-    }
 
-    # Reorder columns to match the full set
-    df <- df[all_cols]
-    return(df)
-  })
-
-  # Row bind all standardized dataframes
-  result <- do.call(rbind, standardized_list)
-  return(result)
-}
 
 
