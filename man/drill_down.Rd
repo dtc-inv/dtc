@@ -4,7 +4,7 @@
 \alias{drill_down}
 \title{Drilldown to a lower layer}
 \usage{
-drill_down(tbl_hold, layer = 1, latest = TRUE)
+drill_down(bucket, tbl_hold)
 }
 \arguments{
 \item{tbl_hold}{data.frame with holdings}

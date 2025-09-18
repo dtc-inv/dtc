@@ -101,7 +101,7 @@ latest_holdings <- function(tbl_hold) {
 #   return(res)
 # }
 
-
+#' @export
 drill_down <- function(bucket, tbl_hold) {
   tbl_msl <- read_msl(bucket)
   tbl_hold <- latest_holdings(tbl_hold)
@@ -136,8 +136,6 @@ drill_down <- function(bucket, tbl_hold) {
   }
   return(res)
 }
-
-
 
 
 

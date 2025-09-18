@@ -917,16 +917,27 @@ update_ps_macro_select = function(bucket, wb, is_us = TRUE) {
 }
 
 #' @export
-read_macro_wb <- function (wb, idx_nm) {
-  menu <- readxl::read_excel(wb, "menu")
-  menu <- as.data.frame(menu)
-  col_off <- menu[menu[, 2] == idx_nm, 3]
-  col_off <- na.omit(col_off)
-  dat <- readxl::read_excel(wb, "data", skip = 4)
-  model <- dat[, c(1:7, (col_off - 1):(col_off + 3))]
-  model <- as.data.frame(model)
-  return(model)
+piper_sandler_macro <- function(bucket, wb, idx_nm = "Russell 3000",
+                                fct_nm = NULL) {
+  dat <- read_macro_wb(wb, idx_nm)
+  if (is.null(fct_nm)) {
+    colnames(dat)[8:11] <- paste0("MacroSelect", 1:4)
+  } else {
+    colnames(dat)[8:11] <- fct_nm
+  }
+  colnames(dat)[12] <- "MacroSelectRank"
+  tbl_msl <- read_msl(bucket)
+  res <- merge_msl(dat, tbl_msl)
+  if (idx_nm == "Russell 3000") {
+    try_write(bucket, res$inter, "co-data/macro_sel_r3.parquet")
+  }
+  if (idx_nm == "ACWI") {
+    try_write(bucket, res$inter, "co-data/macro_sel_acwi.parquet")
+  }
 }
+
+
+
 
 #' @export
 latest_fina <- function(bucket) {
