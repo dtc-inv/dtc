@@ -231,6 +231,7 @@ qual_roll_up <- function(res, bucket, qual = NULL) {
   return(out)
 }
 
+#' @export
 flatten_drill_down <- function(res) {
   n <- length(res$res)
   flat <- res$res
@@ -260,7 +261,7 @@ flatten_drill_down <- function(res) {
   return(res)
 }
 
-
+#' @export
 qual_group_by <- function(res, bucket, grp) {
   n <- length(res$res)
   if (length(n) == 1) {
@@ -272,6 +273,7 @@ qual_group_by <- function(res, bucket, grp) {
   }
 }
 
+#' @export
 group_tbl <- function(tbl_hold, grp, parent = NULL, summ = "CapWgt") {
   if (grp == "No Group") {
     return(tbl_hold)
@@ -282,17 +284,18 @@ group_tbl <- function(tbl_hold, grp, parent = NULL, summ = "CapWgt") {
         p <- split(tbl_hold, tbl_hold[[parent]])
         g <- lapply(p, \(x) {split(x, x[[grp]])})
         l <- list()
-        x <- lapply(g[[1]], total_qual)
-        dat <- data.frame(Group = names(x), do.call(rbind, x),
-                          row.names = NULL)
-        dat <- dat[, c("Group", summ)]
-        colnames(dat)[2] <- names(g)[1]
-        for (i in 2:length(g)) {
+        dat <- data.frame(Group = unique(tbl_hold[[grp]]))
+        for (i in 1:length(g)) {
           x <- lapply(g[[i]], total_qual)
-          x <- data.frame(Group = names(x), do.call(rbind, x),
-                               row.names = NULL)
-          x <- x[, c("Group", summ)]
-          colnames(x)[2] <- names(g)[i]
+          if (length(x) == 0) {
+            x <- data.frame(A = NA, B = NA)
+            colnames(x) <- c("Group", names(g)[i])
+          } else {
+            x <- data.frame(Group = names(x), do.call(rbind, x),
+                                 row.names = NULL)
+            x <- x[, c("Group", summ)]
+            colnames(x)[2] <- names(g)[i]
+          }
           dat <- left_merge_flat(dat, x, match_by = "Group")
         }
       }
