@@ -137,6 +137,8 @@ drill_down <- function(bucket, tbl_hold) {
   return(res)
 }
 
+
+
 #' @export
 load_qual <- function(bucket) {
   fina <- try_read(bucket, "co-data/fina-latest.parquet")
@@ -155,10 +157,14 @@ merge_qual <- function(tbl_hold, list_data) {
 }
 
 #' @export
-left_merge_flat <- function(x, y, match_by)  {
+left_merge_flat <- function(x, y, match_by, keep_x_dup_col = FALSE)  {
   ix <- match_mult(x, y, match_by)
   dup_col <- colnames(y) %in% colnames(x)
-  cbind(x, y[ix, !dup_col, drop = FALSE])
+  if (keep_x_dup_col) {
+    cbind(x, y[ix, ], drop = FALSE)
+  } else {
+    cbind(x, y[ix, !dup_col, drop = FALSE])
+  }
 }
 
 #' @export
@@ -198,7 +204,7 @@ qual_roll_up <- function(res, bucket, qual = NULL) {
       if (any(!is.na(ix))) {
         ix_df <- data.frame(Total = 1:length(ix), X = ix)
         ix_df <- na.omit(ix_df)
-        for (k in 1:length(ix)) {
+        for (k in 1:nrow(ix_df)) {
           total_df <- as.data.frame(total[[i]][[ix_df$Total[k]]])
           try(x$inter[ix_df$X[k], qual_cols] <- total_df[, qual_cols])
         }
@@ -224,6 +230,87 @@ qual_roll_up <- function(res, bucket, qual = NULL) {
   out$total <- total
   return(out)
 }
+
+flatten_drill_down <- function(res) {
+  n <- length(res$res)
+  flat <- res$res
+  for (i in n:2) {
+    for (j in 1:length(res$res[[i-1]])) {
+      x <- flat[[i-1]][[j]]
+      x$inter[[paste0("Parent", i)]] <- x$inter$DtcName
+      ix <- match(names(res$res[[i]]), x$inter$DtcName)
+      if (any(!is.na(ix))) {
+        ix_df <- data.frame(A = 1:length(ix), B = ix)
+        ix_df <- na.omit(ix_df)
+        insert_list <- list()
+        for (k in 1:nrow(ix_df)) {
+          w <- x$inter[ix_df$B[k], "CapWgt"]
+          insert_df <- res$res[[i]][[ix_df$A[k]]]$inter
+          insert_df[[paste0("Parent", i)]] <- names(res$res[[i]])[ix_df$A[k]]
+          insert_df$CapWgt <- insert_df$CapWgt * w
+          insert_list[[k]] <- insert_df
+        }
+        insert_list[[length(insert_list) + 1]] <- x$inter[-ix_df$B, ]
+        x$inter <- bind_rows_with_na(insert_list)
+      }
+      flat[[i-1]][[j]] <- x
+    }
+  }
+  res$flat <- flat
+  return(res)
+}
+
+
+qual_group_by <- function(res, bucket, grp) {
+  n <- length(res$res)
+  if (length(n) == 1) {
+
+  }
+  group <- list()
+  for (i in n:1) {
+    group[[i]] <- lapply(res$res[[i]], \(x, grp) {group_tbl(x$inter, grp)}, grp)
+  }
+}
+
+group_tbl <- function(tbl_hold, grp, parent = NULL, summ = "CapWgt") {
+  if (grp == "No Group") {
+    return(tbl_hold)
+  }
+  if (grp %in% c("FactsetSector", "GicsMacro", "GicsMap", "RiskCountry")) {
+    if (!is.null(parent)) {
+      if (parent %in% colnames(tbl_hold)) {
+        p <- split(tbl_hold, tbl_hold[[parent]])
+        g <- lapply(p, \(x) {split(x, x[[grp]])})
+        l <- list()
+        x <- lapply(g[[1]], total_qual)
+        dat <- data.frame(Group = names(x), do.call(rbind, x),
+                          row.names = NULL)
+        dat <- dat[, c("Group", summ)]
+        colnames(dat)[2] <- names(g)[1]
+        for (i in 2:length(g)) {
+          x <- lapply(g[[i]], total_qual)
+          x <- data.frame(Group = names(x), do.call(rbind, x),
+                               row.names = NULL)
+          x <- x[, c("Group", summ)]
+          colnames(x)[2] <- names(g)[i]
+          dat <- left_merge_flat(dat, x, match_by = "Group")
+        }
+      }
+    } else {
+      g <- split(tbl_hold, tbl_hold[[grp]])
+      x <- lapply(g, total_qual)
+      dat <- data.frame(Group = names(x), do.call(rbind, x), row.names = NULL)
+    }
+  }
+  if (grp %in% c("PE", "PB", "PFCF", "DY")) {
+
+  }
+  if (grp == "MacroSelectRank") {
+
+  }
+  return(dat)
+}
+
 
 #' @export
 total_qual <- function(tbl_hold) {
