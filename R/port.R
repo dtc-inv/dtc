@@ -137,7 +137,151 @@ drill_down <- function(bucket, tbl_hold) {
   return(res)
 }
 
+#' @export
+load_qual <- function(bucket) {
+  fina <- try_read(bucket, "co-data/fina-latest.parquet")
+  sect <- try_read(bucket, "co-data/sector.parquet")
+  country <- try_read(bucket, "co-data/country.parquet")
+  macro_r3 <- try_read(bucket, "co-data/macro_sel_r3.parquet")
+  return(list(fina, sect, country, macro_r3))
+}
 
+#' @export
+merge_qual <- function(tbl_hold, list_data) {
+  for (i in 1:length(list_data)) {
+    tbl_hold <- left_merge_flat(tbl_hold, list_data[[i]], "DtcName")
+  }
+  return(tbl_hold)
+}
 
+#' @export
+left_merge_flat <- function(x, y, match_by)  {
+  ix <- match_mult(x, y, match_by)
+  dup_col <- colnames(y) %in% colnames(x)
+  cbind(x, y[ix, !dup_col, drop = FALSE])
+}
 
+#' @export
+qual_roll_up <- function(res, bucket, qual = NULL) {
 
+  # columns to total
+  qual_cols <- c("PE", "PB", "PFCF", "DY", "MacroSelect1", "MacroSelect2",
+                 "MacroSelect3", "MacroSelect4", "MacroSelectRank")
+  if (is.null(qual)) {
+    qual <- load_qual(bucket)
+  }
+  n <- length(res)
+  # if just one layer, then all data are level 1, total up and return
+  if (n == 1) {
+    res[[1]][[1]]$inter <- merge_qual(res[[1]][[1]]$inter, qual)
+    total[[1]] <- total_qual(res[[1]][[1]]$inter)
+    out <- list()
+    out$res <- res
+    out$total <- total
+    return(out)
+  }
+  # else we need to keep track of multiple layers
+  total <- list()
+  # merge qualitative data and take first pass at totaling
+  for (i in n:1) {
+    for (j in 1:length(res[[i]])) {
+      res[[i]][[j]]$inter <- merge_qual(res[[i]][[j]]$inter, qual)
+    }
+    total[[i]] <- lapply(res[[i]], \(x){total_qual(x$inter)})
+  }
+  # loop backwards to total up lower levels first, e.g., total up stocks,
+  # then managers, then CTF
+  for (i in n:2) {
+    for (j in 1:length(res[[i-1]])) {
+      x <- res[[i-1]][[j]]
+      ix <- match(names(total[[i]]), x$inter$DtcName)
+      if (any(!is.na(ix))) {
+        ix_df <- data.frame(Total = 1:length(ix), X = ix)
+        ix_df <- na.omit(ix_df)
+        for (k in 1:length(ix)) {
+          total_df <- as.data.frame(total[[i]][[ix_df$Total[k]]])
+          try(x$inter[ix_df$X[k], qual_cols] <- total_df[, qual_cols])
+        }
+      }
+      res[[i-1]][[j]] <- x
+    }
+    total[[i]] <- lapply(res[[i]], \(x){total_qual(x$inter)})
+  }
+  # finally total up the top layer
+  ix <- match(names(total[[2]]), res[[1]][[1]]$inter$DtcName)
+  if (any(!is.na(ix))) {
+    ix_df <- data.frame(Total = 1:length(ix), X = ix)
+    ix_df <- na.omit(ix_df)
+    for (i in 1:length(ix)) {
+      total_df <- as.data.frame(total[[2]][[ix_df$Total[i]]])
+      try(res[[1]][[1]]$inter[ix_df$X[i], qual_cols] <- total_df[, qual_cols])
+    }
+  }
+  total[[1]][[1]] <- total_qual(res[[1]]$Top$inter)
+  # return data, res and total
+  out <- list()
+  out$res <- res
+  out$total <- total
+  return(out)
+}
+
+#' @export
+total_qual <- function(tbl_hold) {
+  if (!"CapWgt" %in% colnames(tbl_hold)) {
+    warning("tbl_hold is miss-specified")
+    return(tbl_hold)
+  }
+  total <- list()
+  total$CapWgt <- sum(tbl_hold$CapWgt, na.rm = TRUE)
+  if ("Value" %in% colnames(tbl_hold)) {
+    total$Value <- sum(as.numeric(tbl_hold$Value), na.rm = TRUE)
+  } else {
+    total$Value <- NA
+  }
+  if ("PE" %in% colnames(tbl_hold)) {
+    total$PE <- wgt_harmonic_mean(tbl_hold$CapWgt, tbl_hold$PE)
+  } else {
+    total$PE <- NA
+  }
+  if ("PB" %in% colnames(tbl_hold)) {
+    total$PB <- wgt_harmonic_mean(tbl_hold$CapWgt, tbl_hold$PB)
+  } else {
+    total$PB <- NA
+  }
+  if ("PFCF" %in% colnames(tbl_hold)) {
+    total$PFCF <- wgt_harmonic_mean(tbl_hold$CapWgt, tbl_hold$PFCF)
+  } else {
+    total$PFCF <- NA
+  }
+  if ("DY" %in% colnames(tbl_hold)) {
+    total$DY <- wgt_avg(tbl_hold$CapWgt, tbl_hold$DY)
+  } else {
+    total$DY <- NA
+  }
+  if ("MacroSelect1" %in% colnames(tbl_hold)) {
+    total$MacroSelect1 <- wgt_avg(tbl_hold$CapWgt, tbl_hold$MacroSelect1)
+  } else {
+    total$MacroSelect1 <- NA
+  }
+  if ("MacroSelect2" %in% colnames(tbl_hold)) {
+    total$MacroSelect2 <- wgt_avg(tbl_hold$CapWgt, tbl_hold$MacroSelect2)
+  } else {
+    total$MacroSelect2 <- NA
+  }
+  if ("MacroSelect3" %in% colnames(tbl_hold)) {
+    total$MacroSelect3 <- wgt_avg(tbl_hold$CapWgt, tbl_hold$MacroSelect3)
+  } else {
+    total$MacroSelect3 <- NA
+  }
+  if ("MacroSelect4" %in% colnames(tbl_hold)) {
+    total$MacroSelect4 <- wgt_avg(tbl_hold$CapWgt, tbl_hold$MacroSelect4)
+  } else {
+    total$MacroSelect4 <- NA
+  }
+  if ("MacroSelectRank" %in% colnames(tbl_hold)) {
+    total$MacroSelectRank <- wgt_avg(tbl_hold$CapWgt, tbl_hold$MacroSelectRank)
+  } else {
+    total$MacroSelectRank <- NA
+  }
+  return(total)
+}

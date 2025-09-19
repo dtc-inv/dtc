@@ -7,9 +7,9 @@
 handle_bd_batch(bucket, json, as_of)
 }
 \arguments{
-\item{json}{data read in from \code{\link{unzip_bd_batch}}}
+\item{bucket}{s3 filesystem}
 
-\item{ac}{arcticDB datastore}
+\item{json}{data read in from \code{\link{unzip_bd_batch}}}
 }
 \value{
 does not return data, transactions, market values, and holdings

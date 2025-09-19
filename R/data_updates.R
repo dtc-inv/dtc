@@ -10,7 +10,7 @@
 #' @return does not return data, holdings and transactions are stored in
 #'   parquet files in S3
 #' @export
-hold_ctf_daily <- function(api_keys, as_of = NULL) {
+hold_ctf_daily <- function(bucket, api_keys, as_of = NULL) {
   if (is.null(as_of)) {
     as_of <- last_us_trading_day()
   }
@@ -965,6 +965,8 @@ latest_fina <- function(bucket) {
 }
 
 rm_dup_holdings <- function(bucket) {
+  # be careful, will remove duplicates based on Name field, need to subset
+  # SEC and BD, really subset BD
   files <- bucket$ls("holdings/")
   for (i in 1:length(files)) {
     x <- try_read(bucket, files[i])

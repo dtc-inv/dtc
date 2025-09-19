@@ -4,7 +4,7 @@
 \alias{hold_ctf_daily}
 \title{Execute Batch API Download from BlackDiamond}
 \usage{
-hold_ctf_daily(api_keys, as_of = NULL)
+hold_ctf_daily(bucket, api_keys, as_of = NULL)
 }
 \arguments{
 \item{api_keys}{list with credentials}

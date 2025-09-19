@@ -228,7 +228,7 @@ unzip_bd_batch <- function(resp) {
 }
 
 #' @title Parse JSON file from BlackDiamond Batch Download Process
-#' @param ac arcticDB datastore
+#' @param bucket s3 filesystem
 #' @param json data read in from \code{\link{unzip_bd_batch}}
 #' @return does not return data, transactions, market values, and holdings
 #'   are stored in arcticDB cloud (S3) through \code{ac}
