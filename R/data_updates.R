@@ -450,7 +450,7 @@ ret_backfill = function() {
 
 #' @title execute backfill
 #' @export
-run_backfill = function() {
+run_backfill = function(bucket) {
   ret_meta <- try_read(bucket, "meta-tables/ret-meta.parquet")
   daily <- try_read(bucket, "returns/backfill-daily.parquet")
   if (is.null(daily)) {
@@ -485,7 +485,7 @@ run_backfill = function() {
   if (is.null(monthly)) {
     stop("could not read monthly backfill")
   }
-  dd <- filter(self$tbl_msl, DtcName %in% colnames(monthly)[-1])
+  dd <- filter(tbl_msl, DtcName %in% colnames(monthly)[-1])
   if (nrow(dd > 0)) {
     ret_lib <- na.omit(unique(dd$ReturnLibrary))
   }
