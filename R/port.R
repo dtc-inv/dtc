@@ -235,6 +235,10 @@ qual_roll_up <- function(res, bucket, qual = NULL) {
 flatten_drill_down <- function(res) {
   n <- length(res$res)
   flat <- res$res
+  if(n == 1) {
+    res$flat <- flat
+    return(res)
+  }
   for (i in n:2) {
     for (j in 1:length(res$res[[i-1]])) {
       x <- flat[[i-1]][[j]]
