@@ -177,6 +177,7 @@ qual_roll_up <- function(res, bucket, qual = NULL) {
     qual <- load_qual(bucket)
   }
   n <- length(res)
+  total <- list()
   # if just one layer, then all data are level 1, total up and return
   if (n == 1) {
     res[[1]][[1]]$inter <- merge_qual(res[[1]][[1]]$inter, qual)
@@ -187,7 +188,7 @@ qual_roll_up <- function(res, bucket, qual = NULL) {
     return(out)
   }
   # else we need to keep track of multiple layers
-  total <- list()
+
   # merge qualitative data and take first pass at totaling
   for (i in n:1) {
     for (j in 1:length(res[[i]])) {
