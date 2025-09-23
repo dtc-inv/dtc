@@ -243,7 +243,7 @@ flatten_drill_down <- function(res) {
   for (i in n:2) {
     for (j in 1:length(res$res[[i-1]])) {
       x <- flat[[i-1]][[j]]
-      x$inter[[paste0("Parent", i)]] <- x$inter$DtcName
+      x$inter[[paste0("Parent", i-1)]] <- names(flat[[i-1]])[j]
       ix <- match(names(res$res[[i]]), x$inter$DtcName)
       if (any(!is.na(ix))) {
         ix_df <- data.frame(A = 1:length(ix), B = ix)
@@ -251,13 +251,17 @@ flatten_drill_down <- function(res) {
         insert_list <- list()
         for (k in 1:nrow(ix_df)) {
           w <- x$inter[ix_df$B[k], "CapWgt"]
-          insert_df <- res$res[[i]][[ix_df$A[k]]]$inter
+          insert_df <- flat[[i]][[ix_df$A[k]]]$inter
+          insert_df[[paste0("Parent", i-1)]] <- names(flat[[i-1]])[j]
           insert_df[[paste0("Parent", i)]] <- names(res$res[[i]])[ix_df$A[k]]
           insert_df$CapWgt <- insert_df$CapWgt * w
           insert_list[[k]] <- insert_df
         }
         insert_list[[length(insert_list) + 1]] <- x$inter[-ix_df$B, ]
         x$inter <- bind_rows_with_na(insert_list)
+        is_miss <- is.na(x$inter[[paste0("Parent", i)]])
+        x$inter[is_miss, paste0("Parent", i)] <-
+          paste0(x$inter[is_miss, paste0("Parent", i-1)], " Layer 1")
       }
       flat[[i-1]][[j]] <- x
     }
