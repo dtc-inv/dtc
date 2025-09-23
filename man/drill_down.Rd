@@ -2,21 +2,18 @@
 % Please edit documentation in R/port.R
 \name{drill_down}
 \alias{drill_down}
-\title{Drilldown to a lower layer}
+\title{Drilldown into holdings table}
 \usage{
 drill_down(bucket, tbl_hold)
 }
 \arguments{
-\item{tbl_hold}{data.frame with holdings}
+\item{bucket}{S3 file system}
 
-\item{layer}{numeric value for which layer to drilldown to}
-
-\item{latest}{boolean to subset for most recent holdings}
+\item{tbl_hold}{data.frame of portfolio holdings}
 }
 \value{
-list with underlying holdings data.frame and a data.frame
-  for holdings not found in the MSL
+list with different layers
 }
 \description{
-Drilldown to a lower layer
+Drilldown into holdings table
 }

@@ -43,64 +43,10 @@ latest_holdings <- function(tbl_hold) {
   tbl_hold[is_latest, ]
 }
 
-#' @title Drilldown to a lower layer
-#' @param tbl_hold data.frame with holdings
-#' @param layer numeric value for which layer to drilldown to
-#' @param latest boolean to subset for most recent holdings
-#' @return list with underlying holdings data.frame and a data.frame
-#'   for holdings not found in the MSL
-#' @export
-# drill_down <- function(tbl_hold, layer = 1, latest = TRUE) {
-#   if (latest) {
-#     tbl_hold <- latest_holdings(tbl_hold)
-#   }
-#   tbl_miss <- data.frame()
-#   tbl_msl <- read_msl(bucket)
-#   if (!check_msl_fields(tbl_hold)) {
-#     res <- merge_msl(tbl_hold, tbl_msl)
-#     tbl_miss <- res$miss
-#     tbl_hold <- res$inter
-#   } else {
-#     tbl_miss <- tbl_hold[is.na(tbl_hold$DtcName), ]
-#   }
-#   is_lay_1 <- tbl_hold$Layer <= layer
-#   if (all(is_lay_1)) {
-#     warning("no layers beyond 1 found")
-#     return(tbl_hold)
-#   }
-#   lay_1 <- tbl_hold[is_lay_1, ]
-#   x <- tbl_hold[!is_lay_1, ]
-#   for (i in 1:10) {
-#     for (j in 1:nrow(x)) {
-#       record <- read_hold(x$DtcName[j], bucket)[[1]]
-#       if (latest) {
-#         record <- latest_holdings(record)
-#       }
-#       record[, paste0("Layer", x$Layer[j])] <- x$DtcName[j]
-#       record$CapWgt <- record$CapWgt * x$CapWgt[j]
-#       lay_1 <- rob_rbind(lay_1, record)
-#     }
-#     res <- merge_msl(lay_1, tbl_msl, FALSE)
-#     lay_1 <- res$inter
-#     tbl_miss <- rob_rbind(tbl_miss, res$miss)
-#     is_lay_1 <- lay_1$Layer <= layer + i - 1
-#     if (any(is.na(is_lay_1))) {
-#       warning("some layer observations missing in tbl_msl")
-#       is_lay_1[is.na(is_lay_1)] <- TRUE
-#     }
-#     x <- lay_1[!is_lay_1, ] # case where lay 2 invests in lay 2
-#     if (nrow(x) == 0) {
-#       break
-#     }
-#   }
-#   lay_1 <- lay_1[lay_1$Layer == 1, ]
-#   tbl_hold <- lay_1
-#   res <- list()
-#   res$tbl_hold <- tbl_hold
-#   res$tbl_miss <- tbl_miss
-#   return(res)
-# }
-
+#' @title Drilldown into holdings table
+#' @param bucket S3 file system
+#' @param tbl_hold data.frame of portfolio holdings
+#' @return list with different layers
 #' @export
 drill_down <- function(bucket, tbl_hold) {
   tbl_msl <- read_msl(bucket)
@@ -148,6 +94,10 @@ load_qual <- function(bucket) {
   return(list(fina, sect, country, macro_r3))
 }
 
+#' @title Merge Qualitative Data with holdings
+#' @param tbl_hold data.frame with portfolio holdings
+#' @param list_data list of data.frames with Qualitative Data
+#' @note tables are merged based on DtcName field, left join
 #' @export
 merge_qual <- function(tbl_hold, list_data) {
   for (i in 1:length(list_data)) {
@@ -156,6 +106,14 @@ merge_qual <- function(tbl_hold, list_data) {
   return(tbl_hold)
 }
 
+#' @title Utility function to return left merge of x and y as data.frame
+#' @param x data.frame
+#' @param y data.frame to form left join
+#' @param match_by string to represent which field (column) to match
+#' @param keep_x_dup_col boolean to keep duplicate columns in the x data.frame,
+#'   default is FALSE meaning common fields from y will replace counterparts in
+#'   x
+#' @return data.frame of x, y join
 #' @export
 left_merge_flat <- function(x, y, match_by, keep_x_dup_col = FALSE)  {
   ix <- match_mult(x, y, match_by)
@@ -167,6 +125,11 @@ left_merge_flat <- function(x, y, match_by, keep_x_dup_col = FALSE)  {
   }
 }
 
+#' @title Roll up qualitative data
+#' @param res output from drill_down() function
+#' @param bucket s3 file system
+#' @param qual optional list of qualitative data, leave NULL to load defaults
+#' @return list with qualitative data merged and total slot for totals
 #' @export
 qual_roll_up <- function(res, bucket, qual = NULL) {
 
@@ -232,6 +195,9 @@ qual_roll_up <- function(res, bucket, qual = NULL) {
   return(out)
 }
 
+#' @title Flatten drill down list
+#' @param res output from qual_roll_up() function
+#' @return adds flat slot with data.frames
 #' @export
 flatten_drill_down <- function(res) {
   n <- length(res$res)
@@ -321,6 +287,13 @@ group_tbl <- function(tbl_hold, grp, parent = NULL, summ = "CapWgt") {
 
   }
   return(dat)
+}
+
+#' @export
+prep_hold <- function(bucket, tbl_hold) {
+  res <- drill_down(bucket, tbl_hold)
+  res <- qual_roll_up(res, bucket)
+  flatten_drill_down(res)
 }
 
 
