@@ -198,3 +198,9 @@ port_from_xl <- function(wb, sht, bucket, asset_freq = "D",
   p$rebal()
   return(p)
 }
+
+write_imb <- function(t_minus_m = 0) {
+
+  pres <- read_pptx("N:/Investment Team/REPORTING/IMB/imb-writer/template.pptx")
+
+}

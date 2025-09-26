@@ -128,7 +128,7 @@ ret_ctf_daily = function(bucket, date_start = NULL, date_end = NULL) {
 #' @title Adjust daily CTF return estimates to land on month end returns
 #' @return does not return data, updates "ctf-daily" record in database
 #' @export
-ret_ctf_daily_adj = function() {
+ret_ctf_daily_adj = function(bucket) {
   ctf_meta <- try_read(bucket, "meta-tables/ctf-meta.parquet")
   daily <- try_read(bucket, "returns/ctf-daily.parquet")
   if (is.null(daily)) {
@@ -603,7 +603,7 @@ ret_stock = function(bucket, api_keys,
     stock <- filter(tbl_msl, ReturnLibrary == geo)
     ids <- create_ids(stock)
   } else {
-    ix <- match_ids_dtc_name(ids, self$tbl_msl)
+    ix <- match_ids_dtc_name(ids, tbl_msl)
     if (any(is.na(ix))) {
       stop("ids missing from MSL")
     }
