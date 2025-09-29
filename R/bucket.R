@@ -54,6 +54,19 @@ read_msl <- function(bucket) {
   try_read(bucket, "meta-tables/tbl_msl.parquet")
 }
 
+save_msl <- function(bucket, wb = NULL) {
+  if (is.null(wb)) {
+    wb <- "N:/Investment Team/DATABASES/CustomRet/msl.xlsx"
+  }
+  x <- readxl::read_excel(
+    wb,
+    col_types = c("text", "text", "numeric", "text", "text", "text", "text",
+                  "text", "text", "text", "text"))
+  bucket$CopyFile("meta-tables/tbl_msl.parquet",
+                  "meta-tables/z_tbl_msl.parquet")
+  try_write(bucket, x, "meta-tables/tbl_msl.parquet")
+}
+
 #' @title Read Returns
 #' @param ids ticker, cusip, lei, dtc name, or identifier
 #' @param bucket S3FileSystem object

@@ -339,6 +339,9 @@ merge_msl <- function(tbl_hold, tbl_msl, rm_dup_dates = TRUE) {
     if ("Name" %in% colnames(tbl_hold)) {
       ix <- match_bd_id(tbl_hold$Name, tbl_msl, ix)
     }
+    if ("Id" %in% colnames(tbl_hold)) {
+      ix <- match_bd_id(tbl_hold$Id, tbl_msl, ix)
+    }
   }
   y_dup_col <- colnames(tbl_msl) %in% colnames(tbl_hold)
   x_dup_col <- colnames(tbl_hold) %in% colnames(tbl_msl)
