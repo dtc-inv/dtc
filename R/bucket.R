@@ -54,6 +54,7 @@ read_msl <- function(bucket) {
   try_read(bucket, "meta-tables/tbl_msl.parquet")
 }
 
+#' @export
 save_msl <- function(bucket, wb = NULL) {
   if (is.null(wb)) {
     wb <- "N:/Investment Team/DATABASES/CustomRet/msl.xlsx"

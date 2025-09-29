@@ -333,6 +333,9 @@ merge_msl <- function(tbl_hold, tbl_msl, rm_dup_dates = TRUE) {
   )
   if ("Identifier" %in% colnames(tbl_hold)) {
     ix <- match_bd_id(tbl_hold$Identifier, tbl_msl, ix)
+    if ("AssetId" %in% colnames(tbl_hold)) {
+      ix <- match_bd_id(as.character(tbl_hold$AssetId), tbl_msl, ix)
+    }
     if ("Cusip" %in% colnames(tbl_hold)) {
       ix <- match_bd_id(tbl_hold$Cusip, tbl_msl, ix)
     }
@@ -341,6 +344,9 @@ merge_msl <- function(tbl_hold, tbl_msl, rm_dup_dates = TRUE) {
     }
     if ("Id" %in% colnames(tbl_hold)) {
       ix <- match_bd_id(tbl_hold$Id, tbl_msl, ix)
+    }
+    if ("Ticker" %in% colnames(tbl_hold)) {
+      ix <- match_bd_id(tbl_hold$Ticker, tbl_msl, ix)
     }
   }
   y_dup_col <- colnames(tbl_msl) %in% colnames(tbl_hold)

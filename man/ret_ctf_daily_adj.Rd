@@ -4,7 +4,7 @@
 \alias{ret_ctf_daily_adj}
 \title{Adjust daily CTF return estimates to land on month end returns}
 \usage{
-ret_ctf_daily_adj()
+ret_ctf_daily_adj(bucket)
 }
 \value{
 does not return data, updates "ctf-daily" record in database
