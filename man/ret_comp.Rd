@@ -7,7 +7,8 @@
 ret_comp()
 }
 \value{
-does not return data, updates various return records in the database
+does not return data, updates various return records in the
+  database
 }
 \description{
 Update returns that require computational changes

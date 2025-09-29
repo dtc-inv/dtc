@@ -664,7 +664,8 @@ ret_hfr_index = function(file_nm) {
 #' @details
 #' for example cash plus 200 bps reads the returns of cash, adds 200 bps,
 #' and then saves as a new data-field (return column)
-#' @return does not return data, updates various return records in the database
+#' @return does not return data, updates various return records in the
+#'   database
 #' @export
 ret_comp = function() {
   # cash plus 200 and 400 bps
@@ -723,6 +724,7 @@ ret_fred = function(bucket) {
 #' @param user_email need to provide an email address to download
 #' @param save_to_db boolean to write to DTC's database, default is TRUE
 #' @param return_data boolean to return data.frame of holdings, default is FALSE
+#' @export
 hold_sec <- function(bucket, dtc_name = NULL,
                      user_email = "asotolongo@diversifiedtrust.com",
                      save_to_db = TRUE, return_data = FALSE) {
@@ -771,7 +773,7 @@ hold_sec <- function(bucket, dtc_name = NULL,
             " not found in library, creating new symbol"
           )
         )
-        lib$write(dtc_name[i], dat)
+        try_write(bucket, dat, paste0("holdings/", dtc_name[i], ".parquet"))
       }
     }
     if (return_data) {
