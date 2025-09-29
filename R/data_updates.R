@@ -972,6 +972,7 @@ rm_dup_holdings <- function(bucket) {
   files <- bucket$ls("holdings/")
   for (i in 1:length(files)) {
     x <- try_read(bucket, files[i])
+    x$TimeStamp <- force_date(x$TimeStamp)
     x <- remove_dup_dates(x)
     try_write(bucket, x, files[i])
   }
