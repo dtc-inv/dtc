@@ -91,7 +91,8 @@ load_qual <- function(bucket) {
   sect <- try_read(bucket, "co-data/sector.parquet")
   country <- try_read(bucket, "co-data/country.parquet")
   macro_r3 <- try_read(bucket, "co-data/macro_sel_r3.parquet")
-  return(list(fina, sect, country, macro_r3))
+  macro <- try_read(bucket, "co-data/macro_sel_metrics.parquet")
+  return(list(fina, sect, country, macro_r3, macro))
 }
 
 #' @title Merge Qualitative Data with holdings

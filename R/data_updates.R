@@ -941,7 +941,27 @@ piper_sandler_macro <- function(bucket, wb, idx_nm = "Russell 3000",
   }
 }
 
-
+ps_macro <- function(bucket, wb_nm = NULL) {
+  if (is.null(wb_nm)) {
+    wb_nm <- paste0("C:/Users/asotolongo/Downloads/",
+                    c("D_Macro_Select_R.xlsx", "D_Macro_Select_Global.xlsx"))
+  }
+  dat <- list()
+  for (i in 1:length(wb_nm)) {
+    raw <- readxl::read_excel(wb_nm[i], "data", skip = 4)
+    raw <- raw[!is.na(raw$Ticker), ]
+    ix <- colnames(raw) %in% c("Ticker", "ISIN", "Company Name", "F1", "F2",
+                               "F3", "F4")
+    dat[[i]] <- raw[, ix]
+  }
+  tbl_msl <- read_msl(bucket)
+  res <- do.call(rbind, dat)
+  is_dup <- duplicated(res$Ticker)
+  res <- res[!is_dup, ]
+  colnames(res)[2] <- "Isin"
+  res <- merge_msl(res, tbl_msl)
+  try_write(bucket, res$inter, "co-data/macro_sel_metrics.parquet")
+}
 
 
 #' @export
