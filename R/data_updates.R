@@ -824,6 +824,7 @@ co_fundamental_data = function(api_keys, bucket, ids = NULL, yrs_back = 1,
     if (any(is.na(ix))) {
       stop("ids missing from MSL")
     }
+    ids <- create_ids(tbl_msl[ix, ])
   }
   ids <- gsub(" ", "", ids)
   iter <- space_ids(ids)
@@ -858,13 +859,15 @@ download_sectors = function(bucket, api_keys, ids = NULL) {
     stock <- filter(tbl_msl, SecType == "us-stock" |
                       SecType == "intl-stock")
     ids <- stock$Isin
+    ids[is.na(ids)] <- stock$Cusip[is.na(ids)]
   } else {
     ix <- match_ids_dtc_name(ids, tbl_msl)
+    stock <- tbl_msl[ix, ]
     if (any(is.na(ix))) {
       stop("ids missing from MSL")
     }
+    ids <- create_ids(stock)
   }
-  ids[is.na(ids)] <- stock$Cusip[is.na(ids)]
   ids <- gsub(" ", "", ids)
   ids <- na.omit(ids)
   iter <- space_ids(ids)
@@ -886,7 +889,7 @@ download_sectors = function(bucket, api_keys, ids = NULL) {
   xdf$DtcName <- stock$DtcName[ix]
   r3 <- try_read(bucket, "co-data/macro_sel_r3.parquet")
   # TO-DO add ACWI
-  r3 <- rename(r3, Isin = ISIN)
+  # r3 <- rename(r3, Isin = ISIN)
   res <- left_merge(r3, tbl_msl, c("Ticker", "Isin"))
   res <- left_merge(xdf, res$inter, "DtcName")
   sect <- res$union[, c("RequestId", "FactsetSector", "DtcName", "Sector")]
@@ -942,23 +945,23 @@ piper_sandler_macro <- function(bucket, wb, idx_nm = "Russell 3000",
 
 
 #' @export
-latest_fina <- function(bucket) {
+latest_fina <- function(bucket, q_back = 0) {
   pe <- try_read(bucket, "co-data/PE.parquet")
   pb <- try_read(bucket, "co-data/PB.parquet")
   pfcf <- try_read(bucket, "co-data/PFCF.parquet")
   dy <- try_read(bucket, "co-data/DY.parquet")
 
   pe <- data.frame(DtcName = colnames(pe)[-1],
-                   PE = as.numeric(pe[nrow(pe), -1]))
+                   PE = as.numeric(pe[nrow(pe) - q_back, -1]))
 
   pb <- data.frame(DtcName = colnames(pb)[-1],
-                   PB = as.numeric(pb[nrow(pb), -1]))
+                   PB = as.numeric(pb[nrow(pb) - q_back, -1]))
 
   pfcf <- data.frame(DtcName = colnames(pfcf)[-1],
-                     PFCF = as.numeric(pfcf[nrow(pfcf), -1]))
+                     PFCF = as.numeric(pfcf[nrow(pfcf) - q_back, -1]))
 
   dy <- data.frame(DtcName = colnames(dy)[-1],
-                   DY = as.numeric(dy[nrow(dy), -1]))
+                   DY = as.numeric(dy[nrow(dy) - q_back, -1]))
 
   xdf <- left_merge(pe, pb, "DtcName")
   xdf <- left_merge(xdf$union, pfcf, "DtcName")
