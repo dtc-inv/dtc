@@ -136,7 +136,8 @@ qual_roll_up <- function(res, bucket, qual = NULL) {
 
   # columns to total
   qual_cols <- c("PE", "PB", "PFCF", "DY", "MacroSelect1", "MacroSelect2",
-                 "MacroSelect3", "MacroSelect4", "MacroSelectRank")
+                 "MacroSelect3", "MacroSelect4", "MacroSelectRank",
+                 "F1", "F2", "F3", "F4")
   if (is.null(qual)) {
     qual <- load_qual(bucket)
   }
@@ -287,6 +288,11 @@ group_tbl <- function(tbl_hold, grp, parent = NULL, summ = "CapWgt") {
   if (grp == "MacroSelectRank") {
 
   }
+  d <- lapply(dat[, -1], list_replace_null)
+  x <- do.call(cbind, lapply(d, unlist))
+  dat <- cbind(dat[, 1], as.data.frame(x, row.names = NULL))
+  colnames(dat)[1] <- "Group"
+  return(dat)
   return(dat)
 }
 
@@ -355,6 +361,18 @@ total_qual <- function(tbl_hold) {
     total$MacroSelectRank <- wgt_avg(tbl_hold$CapWgt, tbl_hold$MacroSelectRank)
   } else {
     total$MacroSelectRank <- NA
+  }
+  if ("F1" %in% colnames(tbl_hold)) {
+    total$F1 <- wgt_avg(tbl_hold$CapWgt, tbl_hold$F1)
+  }
+  if ("F2" %in% colnames(tbl_hold)) {
+    total$F2 <- wgt_avg(tbl_hold$CapWgt, tbl_hold$F2)
+  }
+  if ("F3" %in% colnames(tbl_hold)) {
+    total$F3 <- wgt_avg(tbl_hold$CapWgt, tbl_hold$F3)
+  }
+  if ("F4" %in% colnames(tbl_hold)) {
+    total$F4 <- wgt_avg(tbl_hold$CapWgt, tbl_hold$F4)
   }
   return(total)
 }

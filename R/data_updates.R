@@ -16,7 +16,7 @@ hold_ctf_daily <- function(bucket, api_keys, as_of = NULL) {
   }
   api_keys$bd_key <- refresh_bd_key(api_keys, save_local = TRUE)
   id <- download_bd_batch_id(api_keys, as_of)
-  Sys.sleep(60)
+  Sys.sleep(180)
   res <- download_bd_batch(api_keys, id$id)
   json <- unzip_bd_batch(res)
   handle_bd_batch(bucket, json, as_of)
@@ -941,6 +941,7 @@ piper_sandler_macro <- function(bucket, wb, idx_nm = "Russell 3000",
   }
 }
 
+#' @export
 ps_macro <- function(bucket, wb_nm = NULL) {
   if (is.null(wb_nm)) {
     wb_nm <- paste0("C:/Users/asotolongo/Downloads/",
