@@ -1,3 +1,4 @@
+#' @export
 dtc_col <- function() {
   x <- c(
     "#003057", # navy blue
@@ -12,7 +13,7 @@ dtc_col <- function() {
     "#DE8958", # orange
     "#C1D2C7", # cool green
     "#C55265", # berry
-    "#8DA9B4" # ocean
+    "#8DA9B4"  # ocean
   )
   names(x) <- c("navyblue", "pine", "coolgray", "gold", "mist", "terracotta",
                 "sand", "slateblue", "sage", "orange", "coolgreen", "berry",
@@ -20,6 +21,7 @@ dtc_col <- function() {
   return(x)
 }
 
+#' @export
 set_plot_col <- function(n) {
   x <- dtc_col()
   if (n > length(x)) {
@@ -235,8 +237,22 @@ write_imb <- function(bucket, t_minus_m = 0) {
   pres <- read_pptx("N:/Investment Team/REPORTING/IMB/imb-writer/template.pptx")
   as_of <- floor_date(add_with_rollback(Sys.Date(), months(-t_minus_m)),
                       "months") - 1
+  wb <- "N:/Investment Team/REPORTING/IMB/imb-writer/imb-data-input.xlsx"
+  dict <- readxl::read_excel(wb, "data")
+  descr <- readxl::read_excel(wb, "descr")
+
+  loc <- set_loc()
+
+  # core fixed income
+  x <- read_ret(c("Core Fixed Income", "Bloomberg Barclays U.S. Aggregate",
+                  "BofAML U.S. Treasury Bill 3M"), bucket)
+  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of)
+  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond_ctf,
+                         "Core Fixed Income", "Core Fixed Income CTF", as_of,
+                         "Sector", alloc = TRUE)
 }
 
+#' @export
 set_loc <- function() {
   bond <- list(
     descript = c(left = 0.34, top = 0.75),
@@ -249,6 +265,12 @@ set_loc <- function() {
     perf = c(left = 0.34, top = 6.05),
     alloc = c(left = 0.34, top = 1.67, height = 1)
   )
+  bond_ctf <- bond
+  bond_ctf$descript["top"] <- 0.89
+  bond_ctf$alloc["top"] <- 2.21
+  bond_ctf$alloc["width"] <- 2.22
+  bond_ctf$stats["top"] <- 3.05
+  bond_ctf$char["top"] <- 4.71
   stock = list(
     descript = c(left = 0.45, top = 0.93),
     bar = c(left = 4.81, top = 1.10, width = 4.79, height = 1.95),
@@ -268,6 +290,12 @@ set_loc <- function() {
     capm = c(left = 6, top = 3.17, height = 2.78, width = 3.6),
     perf = c(left = 0.45, top = 3.17)
   )
+  res <- list()
+  res$bond <- bond
+  res$stock <- stock
+  res$alt <- alt
+  res$bond_ctf <- bond_ctf
+  return(res)
 }
 
 #' @title IMB Trailing Performance Table
@@ -396,24 +424,10 @@ imb_wealth_cht <- function(res) {
     )
 }
 
-create_capm_cht <- function(rpt, tm10, freq = "months", funds = TRUE,
-                            adj_scale = TRUE, legend_loc = "right",
-                            dict = NULL) {
-  col <- rpt$col
-  combo <- rpt$ret_combo(freq = freq, date_start = tm10)[[1]]
-  asset <- combo$xp
-  bench <- combo$xb
-  rf <- combo$xrf
-  port <- combo$p
-  if (funds) {
-    if (!is.null(dict)) {
-      asset <- asset[, colnames(asset) %in% dict$Value]
-    }
-    plot_ret <- xts_cbind(asset, port)
-  } else {
-    plot_ret <- port
-  }
-  plot_ret <- xts_cbind(plot_ret, bench)
+#' @export
+imb_capm_cht <- function(res, as_of, adj_scale = TRUE, legend_loc = "right") {
+  tm10 <- as_of - years(10)
+  plot_ret <- res$xb[paste0(tm10, "/")]
   plot_ret <- na.omit(plot_ret)
   plot_y <- calc_geo_ret(plot_ret, "months")
   plot_x <- calc_vol(plot_ret, "months")
@@ -422,9 +436,11 @@ create_capm_cht <- function(rpt, tm10, freq = "months", funds = TRUE,
     y = plot_y,
     name = colnames(plot_ret)
   )
-  plot_dat$Bench <- plot_dat$name %in% colnames(bench)
+  plot_dat$Bench <- plot_dat$name %in% colnames(res$b)
   plot_dat$shape <- ifelse(plot_dat$Bench, 17, 16)
   plot_dat$name <- factor(plot_dat$name, unique(plot_dat$name))
+  col <- set_plot_col(nrow(plot_dat))
+  col <- unname(col)
   res <- ggplot(plot_dat, aes(x = x, y = y, col = name)) +
     geom_point(size = 3, shape =plot_dat$shape) +
     geom_vline(xintercept = plot_dat$x[plot_dat$Bench], color = "grey") +
@@ -473,4 +489,243 @@ create_capm_cht <- function(rpt, tm10, freq = "months", funds = TRUE,
                                   default.unit = "pt"))
   }
   return(res)
+}
+
+#' @export
+imb_alloc_tbl <- function(dict) {
+  col <- dtc_col()
+  wgt <- dict[dict$DataType == "Allocation", c("Field", "Value")]
+  style <- dict[dict$DataType == "Style", c("Field", "Value")]
+  if (nrow(style) > 0) {
+    tbl <- left_join(wgt, style, by = "Field")
+    colnames(tbl) <- c("ALLOCATION", "Target Weight", "Style")
+    tbl <- tbl[, c(1, 3, 2)]
+  } else {
+    tbl <- wgt
+    colnames(tbl) <- c("ALLOCATION", "Target Weight")
+  }
+  tbl$`Target Weight` <- scales::percent(as.numeric(tbl$`Target Weight`) / 100,
+                                         0.1)
+  flextable(tbl) |>
+    theme_alafoli() |>
+    font(part = "body", fontname = "Source Sans Pro Light") |>
+    font(part = "header", fontname = "La Gioconda TT") |>
+    color(i = 1, color = col["navyblue"], part = "header") |>
+    color(part = "body", color = "black") |>
+    height(0.025, i = 1:nrow(tbl)) |>
+    line_spacing(space = 0.5) |>
+    line_spacing(space = 0.75, i = 1) |>
+    hrule(rule = "exact") |>
+    width(j = 1, width = 1.75) |>
+    width(j = 2:ncol(tbl), width = 1.25)
+}
+
+#' @export
+imb_descr_tbl <- function(descr) {
+  col <- dtc_col()
+  tbl <- data.frame(DESCRIPTION = descr$Description)
+  flextable(tbl) |>
+    theme_alafoli() |>
+    font(part = "body", fontname = "Source Sans Pro Light") |>
+    font(part = "header", fontname = "La Gioconda TT") |>
+    color(i = 1, color = col["navyblue"], part = "header") |>
+    color(part = "body", color = "black") |>
+    width(j = 1, width = 4.25) |>
+    border_remove()
+}
+
+
+
+#' @export
+imb_char_tbl <- function(xdf) {
+  col <- dtc_col()
+  per_fld <- xdf[[1]] %in% c("Dividend Yield", "Expense Ratio", "SEC Yield",
+                             "YTM")
+  num_fld <- xdf[[1]] %in% c("TTM P/E Ratio", "TTM P/B Ratio", "Duration")
+  cur_fld <- xdf[[1]] %in% "AUM (MMs)"
+  fdf <- xdf
+  fdf[per_fld, 2] <- scales::percent(as.numeric(xdf[per_fld, 2]),
+                                     accuracy = 0.1)
+  fdf[num_fld, 2] <- scales::number(as.numeric(xdf[num_fld, 2]), accuracy = 0.1)
+  fdf[cur_fld, 2] <- scales::number(as.numeric(xdf[num_fld, 2]), big.mark = ",")
+  flextable(fdf) |>
+    theme_alafoli() |>
+    font(part = "body", fontname = "Source Sans Pro Light") |>
+    font(part = "header", fontname = "La Gioconda TT") |>
+    color(i = 1, color = col["navyblue"], part = "header") |>
+    height(0.18, i = 1:nrow(fdf)) |>
+    width(j = 1, width = 1.2)
+}
+
+#' @export
+imb_maturity_cht <- function(xdf) {
+  col <- set_plot_col(nrow(xdf))
+  col <- unname(col)
+  xdf$Value <- as.numeric(xdf$Value) / 100
+  xdf$Lbl <- scales::percent(xdf$Value, 0.1)
+  xdf$Field <- factor(xdf$Field, unique(xdf$Field))
+  ggplot(xdf, aes(x = Field, y = Value, label = Lbl, fill = Field)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    scale_fill_manual(values = col) +
+    geom_text(
+      aes(y = Value + 0.025),
+      size = 1.75,
+      position = position_dodge(0.9),
+      color = "grey40") +
+    xlab("") + ylab("") + labs(title = "MATURITY", fill = "") +
+    theme_minimal() +
+    theme(
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      text = element_text(
+        size = 6,
+        family = "Source Sans Pro Light",
+        color = "grey40"
+      ),
+      plot.title = element_text(
+        family = "La Gioconda TT",
+        color = col[1],
+        size = 8
+      ),
+      legend.position = "none",
+      axis.text.y = element_blank(),
+      axis.text.x = element_text(
+        size = 5,
+        family = "Source Sans Pro Light",
+        color = "grey40"
+      )
+    )
+}
+
+#' @export
+imb_pie_cht <- function(xdf, pie_type) {
+  xdf$Value <- as.numeric(xdf$Value)
+  xdf$Label <- scales::percent(xdf$Value / 100, 0.1)
+  col <- set_plot_col(nrow(xdf))
+  col <- unname(col)
+  ggplot(xdf, aes(x = "", y = Value, fill = Field, label = Label)) +
+    geom_bar(stat = "identity", width = 1) +
+    coord_polar("y", start = 0) +
+    theme_void() +
+    scale_fill_manual(values = col) +
+    labs(fill = "", title = toupper(pie_type)) +
+    geom_text(position = position_stack(0.5), col = "white", size = 2) +
+    theme(
+      plot.title = element_text(
+        family = "La Gioconda TT",
+        color = col[1],
+        size = 8
+      ),
+      legend.text = element_text(
+        size = 6,
+        family = "Source Sans Pro Light",
+        color = "grey40"
+      ),
+      legend.key.size = unit(0.2, "in"),
+      legend.box.spacing = unit(-10, "pt")
+    )
+}
+
+imb_bond_slide <- function(pres, res, dict, descr, loc, dtc_name, slide_title,
+                           as_of, pie_type = c("Quality", "Sector"),
+                           asset_res = NULL, alloc = FALSE) {
+  pie_type <- pie_type[1]
+  set_flextable_defaults(font.size = 8, font.color = "black")
+  dict <- dict[dict$Page == dtc_name, ]
+  if (nrow(dict) == 0) {
+    stop(paste0(dtc_name, " not found in dictionary"))
+  }
+  descr <- descr[descr$Page == dtc_name, ]
+  if (nrow(dict) == 0) {
+    stop(paste0(dtc_name, " not found in description"))
+  }
+  tbl_descr <- imb_descr_tbl(descr)
+  cht_maturity <- imb_maturity_cht(filter(dict, DataType %in% "Maturity"))
+  cht_pie <- imb_pie_cht(filter(dict, DataType %in% pie_type), pie_type)
+  tbl_stats <- imb_stats_tbl(res, as_of)
+  xdf <- filter(dict, DataType %in% "Characteristics") |>
+    as.data.frame()
+  tbl_char <- imb_char_tbl(xdf[, 3:4])
+  cht_wealth <- imb_wealth_cht(res)
+  cht_capm <- imb_capm_cht(res, as_of, legend_loc = "bottom")
+  tbl_trail_perf <- imb_trail_perf_tbl(res, as_of) |>
+    width(2.25, j = 1)
+  pres <- add_slide(pres, layout = "Body Slide", master = "DTC-Theme-202109") |>
+    ph_with(slide_title, ph_location_label("Text Placeholder 18")) |>
+    # description
+    ph_with(
+      tbl_descr,
+      ph_location(
+        left = loc$descript["left"],
+        top = loc$descript["top"])) |>
+    # maturity
+    ph_with(
+      cht_maturity,
+      ph_location(
+        left = loc$maturity["left"],
+        top = loc$maturity["top"],
+        width = loc$maturity["width"],
+        height = loc$maturity["height"])) |>
+    # pie
+    ph_with(
+      cht_pie,
+      ph_location(
+        left = loc$pie["left"],
+        top = loc$pie["top"],
+        height = loc$pie["height"],
+        width = loc$pie["width"])) |>
+    # stats
+    ph_with(
+      tbl_stats,
+      ph_location(
+        left = loc$stats["left"],
+        top = loc$stats["top"])) |>
+    # characteristics
+    ph_with(
+      tbl_char,
+      ph_location(
+        left = loc$char["left"],
+        top = loc$char["top"])) |>
+    # wealth
+    ph_with(
+      cht_wealth,
+      ph_location(
+        left = loc$wealth["left"],
+        top = loc$wealth["top"],
+        height = loc$wealth["height"],
+        width = loc$wealth["width"])) |>
+    # capm
+    ph_with(
+      cht_capm,
+      ph_location(
+        left = loc$capm["left"],
+        top = loc$capm["top"],
+        height = loc$capm["height"],
+        width = loc$capm["width"])) |>
+    # perf
+    ph_with(
+      tbl_trail_perf,
+      ph_location(
+        left = loc$perf["left"],
+        top = loc$perf["top"])) |>
+    # as of date
+    ph_with(
+      format(as_of, "%B %Y"),
+      ph_location_label("Text Placeholder 3")
+    )
+
+  if (alloc) {
+    tbl_alloc <- imb_alloc_tbl(dict)
+    pres <- ph_with(
+      pres,
+      tbl_alloc,
+      ph_location(
+        left = loc$alloc["left"],
+        top = loc$alloc["top"],
+        height = loc$alloc["height"],
+        width = loc$alloc["width"]
+      ))
+  }
+  return(pres)
 }
