@@ -1,3 +1,4 @@
+#' @export
 tbl_mpt <- function(res, freq = "days") {
   if (inherits(res$b, "xts")) {
     if (ncol(res$b) == 0) {
@@ -31,11 +32,11 @@ tbl_mpt <- function(res, freq = "days") {
   if (!is_bench) {
     x <- rbind(
       scales::percent(geo_ret, 0.01),
-      scales::percent(vol, 0.01), 
-      scales::percent(down_vol, 0.01), 
-      scales::percent(max_dd, 0.01), 
-      scales::number(sharpe, 0.01), 
-      scales::number(sortino, 0.01), 
+      scales::percent(vol, 0.01),
+      scales::percent(down_vol, 0.01),
+      scales::percent(max_dd, 0.01),
+      scales::number(sharpe, 0.01),
+      scales::number(sortino, 0.01),
       scales::number(recov, 0.01),
       scales::percent(per_up, 0.01),
       scales::percent(per_down, 0.01),
@@ -44,7 +45,7 @@ tbl_mpt <- function(res, freq = "days") {
       scales::number(avg_up / -avg_down, 0.01),
       scales::number((avg_up * per_up) / -(avg_down * per_down), 0.01)
     )
-    num <- rbind(geo_ret, vol, down_vol, max_dd, sharpe, sortino, recov, 
+    num <- rbind(geo_ret, vol, down_vol, max_dd, sharpe, sortino, recov,
                  per_up, per_down, avg_up, avg_down, avg_up / -avg_down,
                  (avg_up * per_up) / -(avg_down * per_down))
     xdf <- data.frame(
@@ -91,16 +92,16 @@ tbl_mpt <- function(res, freq = "days") {
     x <- rbind(
       scales::percent(geo_ret, 0.01),
       scales::percent(act_ret, 0.01),
-      scales::percent(vol, 0.01), 
+      scales::percent(vol, 0.01),
       scales::number(xbeta, 0.01),
       scales::percent(te, 0.01),
-      scales::percent(down_vol, 0.01), 
+      scales::percent(down_vol, 0.01),
       scales::percent(max_dd, 0.01),
       scales::percent(max_te_dd, 0.01),
       scales::number(sharpe, 0.01),
       scales::number(treynor, 0.01),
       scales::number(ir, 0.01),
-      scales::number(sortino, 0.01), 
+      scales::number(sortino, 0.01),
       scales::number(recov, 0.01),
       scales::number(act_ret / -max_te_dd, 0.01),
       scales::percent(up_capt, 0.01),
@@ -121,7 +122,7 @@ tbl_mpt <- function(res, freq = "days") {
       Metric = c("Geometric Return", "Active Return", "Volatility",
                  "Beta", "Tracking Error", "Downside Vol", "Worst Drawdown",
                  "Worst Active Drawdown", "Sharpe Ratio", "Treynor Ratio",
-                 "Info Ratio", "Sortino Ratio", "Recovery Ratio", 
+                 "Info Ratio", "Sortino Ratio", "Recovery Ratio",
                  "Active Recovery Ratio", "Up Capture", "Down Capture",
                  "Up Capt / Down Capt",
                  "Batting Average", "Alpha", "Correlation", "R-squared",
@@ -135,13 +136,13 @@ tbl_mpt <- function(res, freq = "days") {
     num <- rbind(geo_ret, act_ret, vol, xbeta, te, down_vol, max_dd, max_te_dd,
                  sharpe, treynor, ir, sortino, recov, act_ret / -max_te_dd,
                  up_capt, down_capt, up_capt / down_capt, bat_avg, xalpha,
-                 xcor, xcor^2, per_up, per_down, avg_up, avg_down, 
+                 xcor, xcor^2, per_up, per_down, avg_up, avg_down,
                  avg_up / -avg_down, (avg_up * per_up) / -(avg_down * per_down))
     numdf <- data.frame(
       Metric = c("Geometric Return", "Active Return", "Volatility",
                  "Beta", "Tracking Error", "Downside Vol", "Worst Drawdown",
                  "Worst Active Drawdown", "Sharpe Ratio", "Treynor Ratio",
-                 "Info Ratio", "Sortino Ratio", "Recovery Ratio", 
+                 "Info Ratio", "Sortino Ratio", "Recovery Ratio",
                  "Active Recovery Ratio", "Up Capture", "Down Capture",
                  "Up Capt / Down Capt",
                  "Batting Average", "Alpha", "Correlation", "R-squared",
@@ -189,7 +190,7 @@ tbl_port_wgt <- function(rv, freq = "days") {
     dd_ctr <- p$contr_to_ret(dd_sort$StartDate[1], dd_sort$TroughDate[1])
     rel_dd_wgt <- dd_ctr / sum(dd_ctr)
     res$Active.Drawdown.Weight <- scales::percent(rel_dd_wgt, 0.01)
-    tot_rows$Active.Drawdown.Weight <- 
+    tot_rows$Active.Drawdown.Weight <-
       scales::percent(c(1, dd_sort$Drawdown[1]), 0.01)
   }
   res <- rbind(res, tot_rows)
@@ -219,12 +220,12 @@ viz_rel_perf_cone <- function(x, b, freq = "days", mu = NULL, sigma = NULL) {
     Mu = mu_line,
     Up.1 = mu_line + sigma_line,
     Up.2 = mu_line + 2 * sigma_line,
-    Down.1 = mu_line - sigma_line, 
+    Down.1 = mu_line - sigma_line,
     Down.2 = mu_line - 2 * sigma_line
   )
   tdf <- pivot_longer(xdf, -Date)
   tdf$value <- exp(tdf$value)
-  ggplot(tdf, aes(x = Date, y = value, color = name)) + 
+  ggplot(tdf, aes(x = Date, y = value, color = name)) +
     geom_line() +
     scale_y_continuous(trans = "log")
 }
@@ -234,7 +235,7 @@ contr_to_ret = function(p, date_start = NULL, date_end = NULL) {
   date_end <- as.Date(date_end)
   ctr_mat <- cut_time(p$ctr_mat, date_start, date_end)
   if (!is.null(date_start)) {
-    pw <- prod(1 + cut_time(p$rebal_ret, date_end = date_start -1)) * 
+    pw <- prod(1 + cut_time(p$rebal_ret, date_end = date_start -1)) *
       100
   } else {
     pw <- 100
@@ -242,3 +243,16 @@ contr_to_ret = function(p, date_start = NULL, date_end = NULL) {
   colSums(ctr_mat) / pw
 }
 
+#' @export
+viz_wealth_index <- function (x, init_val = 100) {
+  wi <- ret_to_price(x) * init_val
+  dat <- xts_to_tidy(wi)
+  dat$name <- factor(dat$name, unique(dat$name))
+  col <- set_plot_col(ncol(x))
+  col <- unname(col)
+  ggplot(dat, aes(x = Date, y = value, color = name)) + geom_line() +
+    scale_color_manual(values = col) +
+    scale_y_continuous(labels = scales::number) +
+    ylab("") + labs(color = "", title = "Cumulative Wealth") +
+    theme_light()
+}
