@@ -796,7 +796,7 @@ hold_sec <- function(bucket, dtc_name = NULL,
 #' @return does not return data, updates database with fundamental data
 #' @seealso \code{\link{download_fs_formula}}
 #' @export
-co_fundamental_data = function(api_keys, bucket, ids = NULL, yrs_back = 1,
+co_fundamental_data <- function(api_keys, bucket, ids = NULL, yrs_back = 1,
     dtype = c('PE', 'PB', 'PFCF', 'DY', 'ROE', 'MCAP')) {
 
   dtype <- dtype[1]
@@ -853,7 +853,7 @@ co_fundamental_data = function(api_keys, bucket, ids = NULL, yrs_back = 1,
 }
 
 #' @export
-download_sectors = function(bucket, api_keys, ids = NULL) {
+download_sectors <- function(bucket, api_keys, ids = NULL) {
   tbl_msl <- read_msl(bucket)
   if (is.null(ids)) {
     stock <- filter(tbl_msl, SecType == "us-stock" |
@@ -899,13 +899,21 @@ download_sectors = function(bucket, api_keys, ids = NULL) {
   try_write(bucket, res$union, "co-data/sector.parquet")
 }
 
+get_country_region <- function(bucket) {
+  country <- try_read(bucket, "co-data/country.parquet")
+  geo <- try_read(bucket, "co-data/geo.parquet")
+  country$Country <- country$RiskCountry
+  country <- left_merge(country, geo, "Country", FALSE)
+  return(country)
+}
+
 
 #' @title Download Macro Select Workbook and Save to Library
 #' @param bucket s3 file system
 #' @param wb file location of workbook
 #' @param is_us TRUE for Russell 3000, FALSE for MSCI ACWI
 #' @export
-update_ps_macro_select = function(bucket, wb, is_us = TRUE) {
+update_ps_macro_select <- function(bucket, wb, is_us = TRUE) {
   if (is_us) {
     idx_nm <- "Russell 3000"
   } else {

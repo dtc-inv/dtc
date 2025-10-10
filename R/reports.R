@@ -344,7 +344,7 @@ write_imb <- function(bucket, t_minus_m = 0) {
                          "Sector", alloc = FALSE)
 
   print("TLT")
-  x <- read_ret(c("VTIP", "Bloomberg Barclays U.S. Treasury 20+ Yr",
+  x <- read_ret(c("TLT", "Bloomberg Barclays U.S. Treasury 20+ Yr",
                   "BofAML U.S. Treasury Bill 3M"), bucket)
   res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
                               freq = "months")
@@ -352,6 +352,61 @@ write_imb <- function(bucket, t_minus_m = 0) {
                          "iShares 20 Year Treasury (TLT)",
                          "iShares 20 Year Treasury", as_of,
                          "Sector", alloc = FALSE)
+
+  print("US Core Equity")
+  x <- read_ret(c("US Core Equity", "Russell 3000",
+                  "BofAML U.S. Treasury Bill 3M"), bucket)
+  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+                              freq = "months")
+  pres <- imb_equity_slide(pres, res, dict, descr, loc$stock, "US Core Equity",
+                           "IWV", "US Core Equity CTF", as_of,
+                           bar_type = "Sector",
+                           asset_res = TRUE, alloc = TRUE)
+
+  x <- read_ret(c("US Core Equity MF", "Russell 3000",
+                  "BofAML U.S. Treasury Bill 3M"), bucket)
+  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+                              freq = "months")
+  pres <- imb_equity_slide(pres, res, dict, descr, loc$stock,
+                           "US Core Equity MF",
+                           "IWV", "US Core Equity MF", as_of,
+                           bar_type = "Sector",
+                           asset_res = FALSE, alloc = TRUE)
+
+
+  print("US Active Equity")
+  x <- read_ret(c("US Active Equity", "Russell 3000",
+                  "BofAML U.S. Treasury Bill 3M"), bucket)
+  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+                              freq = "months")
+  pres <- imb_equity_slide(pres, res, dict, descr, loc$stock,
+                           "US Active Equity",
+                           "IWV", "US Active Equity CTF", as_of,
+                           bar_type = "Sector",
+                           asset_res = TRUE, alloc = TRUE)
+
+  x <- read_ret(c("US Active Equity MF", "Russell 3000",
+                  "BofAML U.S. Treasury Bill 3M"), bucket)
+  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+                              freq = "months")
+  pres <- imb_equity_slide(pres, res, dict, descr, loc$stock,
+                           "US Active Equity MF",
+                           "IWV", "US Active Equity MF", as_of,
+                           bar_type = "Sector",
+                           asset_res = FALSE, alloc = TRUE)
+
+  x <- read_ret(c("International Equity", "MSCI ACWI ex US",
+                  "BofAML U.S. Treasury Bill 3M"), bucket)
+  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+                              freq = "months")
+  pres <- imb_equity_slide(pres, res, dict, descr, loc$stock,
+                           "International Equity MF",
+                           "ACWX", "International Equity MF", as_of,
+                           bar_type = "Country",
+                           asset_res = FALSE, alloc = TRUE)
+
+
+
 
   print(pres, "~/imb.pptx")
 }
@@ -382,7 +437,7 @@ set_loc <- function() {
     char = c(left = 0.45, top = 4.91),
     wealth = c(left = 2.2, top = 3.17, height = 2.78, width = 3.6),
     capm = c(left = 6, top = 3.17, height = 2.78, width = 3.6),
-    perf = c(left = 0.45, top = 3.17),
+    perf = c(left = 0.45, top = 6.05),
     alloc = c(left = 0.45, top = 2.05, height = 1.15)
   )
   alt = list(
@@ -655,7 +710,7 @@ imb_char_tbl <- function(xdf) {
   fdf <- xdf
   if (any(per_fld)) {
     fdf[per_fld, 2] <- scales::percent(as.numeric(xdf[per_fld, 2]),
-                                       accuracy = 0.1)
+                                       accuracy = 0.01)
   }
   if (any(num_fld)) {
     fdf[num_fld, 2] <- scales::number(as.numeric(xdf[num_fld, 2]),
@@ -744,20 +799,24 @@ imb_pie_cht <- function(xdf, pie_type) {
     )
 }
 
-imb_equity_bar_chart <- function(tbl_bar) {
+imb_equity_bar_chart <- function(tbl_bar, bar_type) {
   col <- dtc_col()
   col <- col[c("navyblue", "pine")]
   col <- unname(col)
-  sect <- pivot_longer(tbl_bar, -Group)
-  abbr <- data.frame(
-    Group = sort(unique(tbl_bar$Group)),
-    Abbr = c("Comm Serv.", "Cons Disc.", "Cons Stap.", "Energy", "Fina.",
-             "Health", "Indust.", "Tech", "Materials", "Real Estate", "Util.")
-  )
-  sect <- left_join(sect, abbr, by = "Group")
-  sect$lbl <- scales::percent(sect$value, 0.1)
-  sect$name <- factor(sect$name, levels = c("Port", "Bench"))
-  ggplot(sect, aes(y = value, x = Abbr, fill = name, label = lbl)) +
+  dat <- pivot_longer(tbl_bar, -Group)
+  if (bar_type == "Sector") {
+    abbr <- data.frame(
+      Group = sort(unique(tbl_bar$Group)),
+      Abbr = c("Comm Serv.", "Cons Disc.", "Cons Stap.", "Energy", "Fina.",
+               "Health", "Indust.", "Tech", "Materials", "Real Estate", "Util.")
+    )
+    dat <- left_join(dat, abbr, by = "Group")
+  } else {
+    dat$Abbr <- dat$Group
+  }
+  dat$lbl <- scales::percent(dat$value, 0.1)
+  dat$name <- factor(dat$name, levels = c("Port", "Bench"))
+  ggplot(dat, aes(y = value, x = Abbr, fill = name, label = lbl)) +
     geom_bar(stat = "identity", position = "dodge") +
     geom_text(
       aes(y = value + 0.025),
@@ -765,7 +824,7 @@ imb_equity_bar_chart <- function(tbl_bar) {
       position = position_dodge(0.9),
       color = "grey40") +
     scale_fill_manual(values = col) +
-    xlab("") + ylab("") + labs(title = "SECTOR", fill = "") +
+    xlab("") + ylab("") + labs(title = toupper(bar_type), fill = "") +
     theme_minimal() +
     theme(panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(),
@@ -798,6 +857,7 @@ imb_equity_slide <- function(pres, res, dict, descr, loc, dtc_name,
                              slide_title,
                              as_of, bar_type = c("Sector", "Country"),
                              asset_res = TRUE, alloc = TRUE) {
+
   bar_type <- bar_type[1]
   set_flextable_defaults(font.size = 8, font.color = "black")
   dict <- dict[dict$Page == dtc_name, ]
@@ -817,17 +877,17 @@ imb_equity_slide <- function(pres, res, dict, descr, loc, dtc_name,
     tbl_bar <- group_tbl(p$flat[[1]][[1]]$inter, "GicsMacro")[, 1:2]
     tbl_b <- group_tbl(b$flat[[1]][[1]]$inter, "GicsMacro")[, 1:2]
   } else if (bar_type == "Country") {
-    tbl_bar <- group_tbl(p$flat[[1]][[1]]$inter, "RiskCountry")[, 1:2]
-    tbl_b <- group_tbl(b$flat[[1]][[1]]$inter, "RiskCountry")[, 1:2]
+    tbl_bar <- group_tbl(p$flat[[1]][[1]]$inter, "Region")[, 1:2]
+    tbl_b <- group_tbl(b$flat[[1]][[1]]$inter, "Region")[, 1:2]
   } else {
     stop("wrong bar_type entered")
   }
   colnames(tbl_bar)[2] <- "Port"
   colnames(tbl_b)[2] <- "Bench"
   tbl_bar <- left_join(tbl_bar, tbl_b, by = "Group")
-  cht_bar <- imb_equity_bar_chart(tbl_bar)
+  cht_bar <- imb_equity_bar_chart(tbl_bar, bar_type)
   tbl_stats <- imb_stats_tbl(res, as_of)
-  exp_ratio <- as.numeric(dict[dict$Field == "Expense Ratio", "Value"]) / 100
+  exp_ratio <- as.numeric(dict[dict$Field == "Expense Ratio", "Value"])
   fina <- unlist(p$total[[1]][[1]])[c("PE", "PB", "DY")]
   tbl_char_in <- data.frame(
     "CHARACTERISTICS" = c("Expense Ratio", "TTM P/E Ratio",

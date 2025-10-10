@@ -84,7 +84,6 @@ drill_down <- function(bucket, tbl_hold) {
 }
 
 
-
 #' @export
 load_qual <- function(bucket) {
   fina <- try_read(bucket, "co-data/fina-latest.parquet")
@@ -255,7 +254,8 @@ group_tbl <- function(tbl_hold, grp, parent = NULL, summ = "CapWgt") {
   if (grp == "No Group") {
     return(tbl_hold)
   }
-  if (grp %in% c("FactsetSector", "GicsMacro", "GicsMap", "RiskCountry")) {
+  if (grp %in% c("FactsetSector", "GicsMacro", "GicsMap", "RiskCountry",
+                 "Region")) {
     if (!is.null(parent)) {
       if (parent %in% colnames(tbl_hold)) {
         p <- split(tbl_hold, tbl_hold[[parent]])
