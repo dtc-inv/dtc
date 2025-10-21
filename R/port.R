@@ -255,7 +255,7 @@ group_tbl <- function(tbl_hold, grp, parent = NULL, summ = "CapWgt") {
     return(tbl_hold)
   }
   if (grp %in% c("FactsetSector", "GicsMacro", "GicsMap", "RiskCountry",
-                 "Region")) {
+                 "Region1", "Region2")) {
     if (!is.null(parent)) {
       if (parent %in% colnames(tbl_hold)) {
         p <- split(tbl_hold, tbl_hold[[parent]])

@@ -4,7 +4,7 @@
 \alias{ret_backfill}
 \title{read in returns to backfill daily and monthly returns}
 \usage{
-ret_backfill()
+ret_backfill(bucket)
 }
 \description{
 read in returns to backfill daily and monthly returns

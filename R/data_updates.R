@@ -437,7 +437,7 @@ ret_workup = function(
 
 #' @title read in returns to backfill daily and monthly returns
 #' @export
-ret_backfill = function() {
+ret_backfill = function(bucket) {
   xl_file <- "N:/Investment Team/DATABASES/CustomRet/backfill-daily.xlsx"
   backfill <- read_xts(xl_file)
   backfill <- xts_to_dataframe(backfill)
@@ -899,11 +899,41 @@ download_sectors <- function(bucket, api_keys, ids = NULL) {
   try_write(bucket, res$union, "co-data/sector.parquet")
 }
 
+download_country <- function(bucket, api_keys, ids = NULL) {
+  tbl_msl <- read_msl(bucket)
+  if (is.null(ids)) {
+    stock <- filter(tbl_msl, SecType == "us-stock" |
+                      SecType == "intl-stock")
+    ids <- stock$Isin
+    ids[is.na(ids)] <- stock$Cusip[is.na(ids)]
+  }
+  ids <- gsub(" ", "", ids)
+  ids <- na.omit(ids)
+  iter <- space_ids(ids)
+  xformula <- c("FREF_ENTITY_COUNTRY(RISK,NAME)",
+                "FREF_ENTITY_COUNTRY(RISK,ISO2)")
+  xdf <- data.frame()
+  for (i in 1:(length(iter)-1)) {
+    json <- download_fs_formula(
+      api_keys = api_keys,
+      ids = ids[iter[i]:iter[i+1]],
+      formulas = xformula
+    )
+    xdf <- rbind(xdf, flatten_fs_formula(json))
+  }
+  colnames(xdf) <- c("ReqId", "RiskCountry", "ISO2")
+  is_dup <- duplicated(xdf$RequestId)
+  xdf <- xdf[!is_dup, ]
+  ix <- match(xdf$ReqId, stock$Isin)
+  ix[is.na(ix)] <- match(xdf$RequestId, stock$Cusip)[is.na(ix)]
+  xdf$DtcName <- stock$DtcName[ix]
+  try_write(bucket, xdf, "co-data/country.parquet")
+}
+
 get_country_region <- function(bucket) {
   country <- try_read(bucket, "co-data/country.parquet")
   geo <- try_read(bucket, "co-data/geo.parquet")
-  country$Country <- country$RiskCountry
-  country <- left_merge(country, geo, "Country", FALSE)
+  country <- left_merge(country, geo, "ISO2", FALSE)
   return(country)
 }
 

@@ -244,114 +244,114 @@ write_imb <- function(bucket, t_minus_m = 0) {
 
   loc <- set_loc()
 
-  print("VWSUX")
-  x <- read_ret(c("VWSUX", "BofAML Municipals 1-2 Yr",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Vanguard Short-Term Tax Exempt (VWSUX)",
-                         "Vanguard Short-Term Tax Exempt", as_of,
-                         "Quality", alloc = FALSE)
-
-  print("FLTMX")
-  x <- read_ret(c("FLTMX", "BofAML Municipals 1-12 Yr",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Fidelity Intermediate Muni (FLTMX)",
-                         "Fidelity Intermediate Muni", as_of,
-                         "Quality", alloc = FALSE)
-
-  print("Short Duration")
-  x <- read_ret(c("Short Duration", "BofAML U.S. Treasuries 1-3 Yr",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Short Duration",
-                         "Short Duration CTF", as_of,
-                         "Sector", alloc = FALSE)
-
-  print("PLDTX")
-  x <- read_ret(c("PLDTX", "BofAML U.S. Treasuries 1-3 Yr",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Pimco Low Duration II (PLDTX)",
-                         "Pimco Low Duration II (PLDTX)", as_of,
-                         "Sector", alloc = FALSE)
-
-  print("Core Fixed Income")
-  x <- read_ret(c("Core Fixed Income", "Bloomberg Barclays U.S. Aggregate",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond_ctf,
-                         "Core Fixed Income", "Core Fixed Income CTF", as_of,
-                         "Sector", alloc = TRUE)
-
-  print("TCPNX")
-  x <- read_ret(c("TCPNX", "Bloomberg Barclays U.S. Aggregate",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Touchstone Total Return Bond (TCPNX)",
-                         "Touchstone Total Return Bond", as_of,
-                         "Sector", alloc = FALSE)
-
-  print("PTTRX")
-  x <- read_ret(c("PTTRX", "Bloomberg Barclays U.S. Aggregate",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Pimco Total Return (PTTRX)",
-                         "Pimco Total Return", as_of,
-                         "Sector", alloc = FALSE)
-
-  print("LSFYX")
-  x <- read_ret(c("LSFYX", "S&P / LSTA Leveraged Loan",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Loomis Sayles Floating Rate (LSFYX)",
-                         "Loomis Sayles Floating Rate", as_of,
-                         "Sector", alloc = FALSE)
-
-  print("CPHUX")
-  x <- read_ret(c("CPHUX", "Bloomberg Barclays U.S. Aggregate",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Columbia Strategic Income (CPHUX)",
-                         "Columbia Strategic Income", as_of,
-                         "Sector", alloc = FALSE)
-
-  print("VTIP")
-  x <- read_ret(c("VTIP", "Bloomberg Barclays U.S. TIPS 0-5 Yr",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "Vanguard Short Term Inflation Protected (VTIP)",
-                         "Vanguard Short Term Inflation Protected", as_of,
-                         "Sector", alloc = FALSE)
-
-  print("TLT")
-  x <- read_ret(c("TLT", "Bloomberg Barclays U.S. Treasury 20+ Yr",
-                  "BofAML U.S. Treasury Bill 3M"), bucket)
-  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-                              freq = "months")
-  pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
-                         "iShares 20 Year Treasury (TLT)",
-                         "iShares 20 Year Treasury", as_of,
-                         "Sector", alloc = FALSE)
+  # print("VWSUX")
+  # x <- read_ret(c("VWSUX", "BofAML Municipals 1-2 Yr",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Vanguard Short-Term Tax Exempt (VWSUX)",
+  #                        "Vanguard Short-Term Tax Exempt", as_of,
+  #                        "Quality", alloc = FALSE)
+  #
+  # print("FLTMX")
+  # x <- read_ret(c("FLTMX", "BofAML Municipals 1-12 Yr",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Fidelity Intermediate Muni (FLTMX)",
+  #                        "Fidelity Intermediate Muni", as_of,
+  #                        "Quality", alloc = FALSE)
+  #
+  # print("Short Duration")
+  # x <- read_ret(c("Short Duration", "BofAML U.S. Treasuries 1-3 Yr",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Short Duration",
+  #                        "Short Duration CTF", as_of,
+  #                        "Sector", alloc = FALSE)
+  #
+  # print("PLDTX")
+  # x <- read_ret(c("PLDTX", "BofAML U.S. Treasuries 1-3 Yr",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Pimco Low Duration II (PLDTX)",
+  #                        "Pimco Low Duration II (PLDTX)", as_of,
+  #                        "Sector", alloc = FALSE)
+  #
+  # print("Core Fixed Income")
+  # x <- read_ret(c("Core Fixed Income", "Bloomberg Barclays U.S. Aggregate",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond_ctf,
+  #                        "Core Fixed Income", "Core Fixed Income CTF", as_of,
+  #                        "Sector", alloc = TRUE)
+  #
+  # print("TCPNX")
+  # x <- read_ret(c("TCPNX", "Bloomberg Barclays U.S. Aggregate",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Touchstone Total Return Bond (TCPNX)",
+  #                        "Touchstone Total Return Bond", as_of,
+  #                        "Sector", alloc = FALSE)
+  #
+  # print("PTTRX")
+  # x <- read_ret(c("PTTRX", "Bloomberg Barclays U.S. Aggregate",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Pimco Total Return (PTTRX)",
+  #                        "Pimco Total Return", as_of,
+  #                        "Sector", alloc = FALSE)
+  #
+  # print("LSFYX")
+  # x <- read_ret(c("LSFYX", "S&P / LSTA Leveraged Loan",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Loomis Sayles Floating Rate (LSFYX)",
+  #                        "Loomis Sayles Floating Rate", as_of,
+  #                        "Sector", alloc = FALSE)
+  #
+  # print("CPHUX")
+  # x <- read_ret(c("CPHUX", "Bloomberg Barclays U.S. Aggregate",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Columbia Strategic Income (CPHUX)",
+  #                        "Columbia Strategic Income", as_of,
+  #                        "Sector", alloc = FALSE)
+  #
+  # print("VTIP")
+  # x <- read_ret(c("VTIP", "Bloomberg Barclays U.S. TIPS 0-5 Yr",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "Vanguard Short Term Inflation Protected (VTIP)",
+  #                        "Vanguard Short Term Inflation Protected", as_of,
+  #                        "Sector", alloc = FALSE)
+  #
+  # print("TLT")
+  # x <- read_ret(c("TLT", "Bloomberg Barclays U.S. Treasury 20+ Yr",
+  #                 "BofAML U.S. Treasury Bill 3M"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # pres <- imb_bond_slide(pres, res, dict, descr, loc$bond,
+  #                        "iShares 20 Year Treasury (TLT)",
+  #                        "iShares 20 Year Treasury", as_of,
+  #                        "Sector", alloc = FALSE)
 
   print("US Core Equity")
   x <- read_ret(c("US Core Equity", "Russell 3000",
@@ -395,7 +395,18 @@ write_imb <- function(bucket, t_minus_m = 0) {
                            bar_type = "Sector",
                            asset_res = FALSE, alloc = TRUE)
 
+  print("International Equity")
   x <- read_ret(c("International Equity", "MSCI ACWI ex US",
+                  "BofAML U.S. Treasury Bill 3M"), bucket)
+  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+                              freq = "months")
+  pres <- imb_equity_slide(pres, res, dict, descr, loc$stock,
+                           "International Equity",
+                           "ACWX", "International Equity CTF", as_of,
+                           bar_type = "Country",
+                           asset_res = FALSE, alloc = TRUE)
+
+  x <- read_ret(c("International Equity MF", "MSCI ACWI ex US",
                   "BofAML U.S. Treasury Bill 3M"), bucket)
   res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
                               freq = "months")
@@ -405,8 +416,61 @@ write_imb <- function(bucket, t_minus_m = 0) {
                            bar_type = "Country",
                            asset_res = FALSE, alloc = TRUE)
 
-
-
+  # print("Multi-Strat")
+  # x <- read_ret(c("Multi-Strategy", "Cash Plus 200 bps",
+  #                 "BofAML U.S. Treasury Bill 3M", "MSCI ACWI"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # capm_res <- clean_asset_bench_rf(x[, 1], x[, 4], x[, 3], date_end = as_of,
+  #                                  freq = "months")
+  # pres <- imb_alt_slide(pres, res, dict, descr, loc$alt, "Multi-Strategy",
+  #                       "Multi-Strategy CTF", as_of, capm_res,
+  #                       alloc_bar = FALSE)
+  #
+  # x <- read_ret(c("Multi-Strategy MF", "Cash Plus 200 bps",
+  #                 "BofAML U.S. Treasury Bill 3M", "MSCI ACWI"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # capm_res <- clean_asset_bench_rf(x[, 1], x[, 4], x[, 3], date_end = as_of,
+  #                                  freq = "months")
+  # pres <- imb_alt_slide(pres, res, dict, descr, loc$alt, "Multi-Strategy MF",
+  #                       "Multi-Strategy MF", as_of, capm_res,
+  #                       alloc_bar = FALSE)
+  #
+  # print("PDF")
+  # x <- read_ret(c("Private Diversifiers", "Cash Plus 400 bps",
+  #                 "BofAML U.S. Treasury Bill 3M", "MSCI ACWI"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # capm_res <- clean_asset_bench_rf(x[, 1], x[, 4], x[, 3], date_end = as_of,
+  #                                  freq = "months")
+  # pres <- imb_alt_slide(pres, res, dict, descr, loc$alt, "Private Diversifiers",
+  #                       "Private Diversifers CTF", as_of, capm_res,
+  #                       alloc_bar = TRUE)
+  #
+  # print("PDF II")
+  # x <- read_ret(c("Private Diversifiers II", "Cash Plus 400 bps",
+  #                 "BofAML U.S. Treasury Bill 3M", "MSCI ACWI"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # capm_res <- clean_asset_bench_rf(x[, 1], x[, 4], x[, 3], date_end = as_of,
+  #                                  freq = "months")
+  # pres <- imb_alt_slide(pres, res, dict, descr, loc$alt,
+  #                       "Private Diversifiers II",
+  #                       "Private Diversifiers II CTF", as_of, capm_res,
+  #                       alloc_bar = TRUE)
+  #
+  # print("Magnitude")
+  # x <- read_ret(c("Magnitude Capital", "HFRI FOF: Conservative Index",
+  #                 "BofAML U.S. Treasury Bill 3M", "MSCI ACWI"), bucket)
+  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+  #                             freq = "months")
+  # capm_res <- clean_asset_bench_rf(x[, 1], x[, 4], x[, 3], date_end = as_of,
+  #                                  freq = "months")
+  # pres <- imb_alt_slide(pres, res, dict, descr, loc$alt,
+  #                       "Magnitude Capital",
+  #                       "Magnitude Capital", as_of, capm_res,
+  #                       alloc_bar = TRUE)
 
   print(pres, "~/imb.pptx")
 }
@@ -447,7 +511,7 @@ set_loc <- function() {
     char = c(left = 0.45, top = 4.91),
     wealth = c(left = 2.2, top = 3.17, height = 2.78, width = 3.6),
     capm = c(left = 6, top = 3.17, height = 2.78, width = 3.6),
-    perf = c(left = 0.45, top = 3.17)
+    perf = c(left = 0.45, top = 6.05)
   )
   res <- list()
   res$bond <- bond
@@ -559,11 +623,13 @@ imb_stats_tbl <- function(res, as_of) {
 }
 
 #' @export
-imb_wealth_cht <- function(res) {
+imb_wealth_cht <- function(res, as_of) {
+  tm10 <- as_of - years(10)
   col <- dtc_col()
   plot_col <- col[c("navyblue", "pine")]
   plot_col <- unname(plot_col)
   dat <- res$xb
+  dat <- cut_time(dat, tm10)
   viz_wealth_index(dat) +
     scale_color_manual(values = plot_col) +
     xlab("") + labs(title = "CUMULATIVE PERFORMANCE") +
@@ -806,7 +872,10 @@ imb_equity_bar_chart <- function(tbl_bar, bar_type) {
   dat <- pivot_longer(tbl_bar, -Group)
   if (bar_type == "Sector") {
     abbr <- data.frame(
-      Group = sort(unique(tbl_bar$Group)),
+      Group = c("Communication Services", "Consumer Discretionary",
+                "Consumer Staples", "Energy", "Financials", "Health Care",
+                "Industrails", "Information Technology", "Materials",
+                "Real Estate", "Utilities"),
       Abbr = c("Comm Serv.", "Cons Disc.", "Cons Stap.", "Energy", "Fina.",
                "Health", "Indust.", "Tech", "Materials", "Real Estate", "Util.")
     )
@@ -852,6 +921,129 @@ imb_equity_bar_chart <- function(tbl_bar, bar_type) {
           legend.box.spacing = unit(-10, "pt"))
 }
 
+imb_alt_alloc_chart <- function(xdf) {
+
+  xdf$Field <- factor(xdf$Field, unique(xdf$Field))
+  xdf$Value <- as.numeric(xdf$Value)
+  x <- xdf
+  x <- x[order(x$Field, decreasing = TRUE), ]
+  xdf$LblPos <- cumsum(x$Value)
+  xdf$Lbl <- scales::number(x$Value, 0.1)
+  col <- set_plot_col(nrow(xdf))
+  col <- unname(col)
+  ggplot(xdf, aes(x = DataType, y = Value, fill = Field, label = Lbl)) +
+    geom_bar(stat = "identity", position = position_stack()) +
+    scale_fill_manual(values = col) +
+    xlab("") + ylab("") + labs(fill = "Manager") +
+    geom_label(aes(label = Lbl, group = Field, y = LblPos, nudge_y = -0.1),
+               col = "black",
+               size = 2, fill = "lightgray") +
+    coord_flip() +
+    theme_minimal() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          text = element_text(
+            size = 6,
+            family = "Source Sans Pro Light",
+            color = "grey40"
+          ),
+          plot.title = element_text(
+            family = "La Gioconda TT",
+            color = col[1],
+            size = 8
+          ),
+          legend.position = "bottom",
+          axis.text.y = element_blank(),
+          axis.text.x = element_text(
+            size = 5,
+            family = "Source Sans Pro Light",
+            color = "grey40"
+          ),
+          legend.key.size = unit(0.2, "in"),
+          legend.text = element_text(size = 6,
+                                     family = "Source Sans Pro Light"),
+          legend.box.spacing = unit(-10, "pt"))
+}
+
+imb_alt_slide <- function(pres, res, dict, descr, loc, dtc_name, slide_title,
+                          as_of, capm_res, alloc_bar = TRUE) {
+
+  set_flextable_defaults(font.size = 8, font.color = "black")
+  dict <- dict[dict$Page == dtc_name, ]
+  if (nrow(dict) == 0) {
+    stop(paste0(dtc_name, " not found in dictionary"))
+  }
+  descr <- descr[descr$Page == dtc_name, ]
+  if (nrow(dict) == 0) {
+    stop(paste0(dtc_name, " not found in description"))
+  }
+  tbl_descr <- imb_descr_tbl(descr)
+  tbl_stats <- imb_stats_tbl(capm_res, as_of)
+  cht_wealth <- imb_wealth_cht(res, as_of)
+  cht_capm <- imb_capm_cht(capm_res, as_of, legend_loc = "bottom")
+  tbl_trail_perf <- imb_trail_perf_tbl(res, as_of)
+  if (alloc_bar) {
+    xdf <- filter(dict, DataType %in% "Allocation")
+    tbl_alloc <- imb_alt_alloc_chart(xdf)
+  } else {
+    tbl_alloc <- imb_alloc_tbl(dict)
+  }
+  pres <- add_slide(pres, layout = "Body Slide", master = "DTC-Theme-202109") |>
+    ph_with(slide_title, ph_location_label("Text Placeholder 18")) |>
+    # description
+    ph_with(
+      tbl_descr,
+      ph_location(
+        left = loc$descript["left"],
+        top = loc$descript["top"])) |>
+    # stats
+    ph_with(
+      tbl_stats,
+      ph_location(
+        left = loc$stats["left"],
+        top = loc$stats["top"])) |>
+    # wealth
+    ph_with(
+      cht_wealth,
+      ph_location(
+        left = loc$wealth["left"],
+        top = loc$wealth["top"],
+        height = loc$wealth["height"],
+        width = loc$wealth["width"])) |>
+    # capm
+    ph_with(
+      cht_capm,
+      ph_location(
+        left = loc$capm["left"],
+        top = loc$capm["top"],
+        height = loc$capm["height"],
+        width = loc$capm["width"])) |>
+    # perf
+    ph_with(
+      tbl_trail_perf,
+      ph_location(
+        left = loc$perf["left"],
+        top = loc$perf["top"])) |>
+    # as of date
+    ph_with(
+      format(as_of, "%B %Y"),
+      ph_location_label("Text Placeholder 3")
+    ) |>
+    # alloc
+    ph_with(
+      tbl_alloc,
+      ph_location(
+        left = loc$alloc["left"],
+        top = loc$alloc["top"],
+        height = loc$alloc["height"],
+        width = loc$alloc["width"]))
+  return(pres)
+}
+
+
+
+
 imb_equity_slide <- function(pres, res, dict, descr, loc, dtc_name,
                              bench_hold_id,
                              slide_title,
@@ -877,14 +1069,16 @@ imb_equity_slide <- function(pres, res, dict, descr, loc, dtc_name,
     tbl_bar <- group_tbl(p$flat[[1]][[1]]$inter, "GicsMacro")[, 1:2]
     tbl_b <- group_tbl(b$flat[[1]][[1]]$inter, "GicsMacro")[, 1:2]
   } else if (bar_type == "Country") {
-    tbl_bar <- group_tbl(p$flat[[1]][[1]]$inter, "Region")[, 1:2]
-    tbl_b <- group_tbl(b$flat[[1]][[1]]$inter, "Region")[, 1:2]
+    tbl_bar <- group_tbl(p$flat[[1]][[1]]$inter, "Region2")[, 1:2]
+    tbl_b <- group_tbl(b$flat[[1]][[1]]$inter, "Region2")[, 1:2]
   } else {
     stop("wrong bar_type entered")
   }
   colnames(tbl_bar)[2] <- "Port"
   colnames(tbl_b)[2] <- "Bench"
   tbl_bar <- left_join(tbl_bar, tbl_b, by = "Group")
+  tbl_bar$Port <- tbl_bar$Port / sum(tbl_bar$Port, na.rm = TRUE)
+  tbl_bar$Bench <- tbl_bar$Bench / sum(tbl_bar$Bench, na.rm = TRUE)
   cht_bar <- imb_equity_bar_chart(tbl_bar, bar_type)
   tbl_stats <- imb_stats_tbl(res, as_of)
   exp_ratio <- as.numeric(dict[dict$Field == "Expense Ratio", "Value"])
@@ -895,7 +1089,7 @@ imb_equity_slide <- function(pres, res, dict, descr, loc, dtc_name,
     "FUND" = c(exp_ratio, fina)
   )
   tbl_char <- imb_char_tbl(tbl_char_in)
-  cht_wealth <- imb_wealth_cht(res)
+  cht_wealth <- imb_wealth_cht(res, as_of)
   if (asset_res == TRUE) {
     asset_ret <- read_ret((filter(dict, DataType %in% "Map")$Value), bucket)
     asset_res <- clean_asset_bench_rf(asset_ret, res$b, freq = "months",
@@ -998,7 +1192,7 @@ imb_bond_slide <- function(pres, res, dict, descr, loc, dtc_name, slide_title,
   xdf <- filter(dict, DataType %in% "Characteristics") |>
     as.data.frame()
   tbl_char <- imb_char_tbl(xdf[, 3:4])
-  cht_wealth <- imb_wealth_cht(res)
+  cht_wealth <- imb_wealth_cht(res, as_of)
   cht_capm <- imb_capm_cht(res, as_of, legend_loc = "bottom")
   tbl_trail_perf <- imb_trail_perf_tbl(res, as_of) |>
     width(2.25, j = 1)
