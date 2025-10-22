@@ -460,17 +460,17 @@ write_imb <- function(bucket, t_minus_m = 0) {
   #                       "Private Diversifiers II CTF", as_of, capm_res,
   #                       alloc_bar = TRUE)
   #
-  # print("Magnitude")
-  # x <- read_ret(c("Magnitude Capital", "HFRI FOF: Conservative Index",
-  #                 "BofAML U.S. Treasury Bill 3M", "MSCI ACWI"), bucket)
-  # res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
-  #                             freq = "months")
-  # capm_res <- clean_asset_bench_rf(x[, 1], x[, 4], x[, 3], date_end = as_of,
-  #                                  freq = "months")
-  # pres <- imb_alt_slide(pres, res, dict, descr, loc$alt,
-  #                       "Magnitude Capital",
-  #                       "Magnitude Capital", as_of, capm_res,
-  #                       alloc_bar = TRUE)
+  print("Magnitude")
+  x <- read_ret(c("Magnitude Capital", "HFRI FOF: Conservative Index",
+                  "BofAML U.S. Treasury Bill 3M", "MSCI ACWI"), bucket)
+  res <- clean_asset_bench_rf(x[, 1], x[, 2], x[, 3], date_end = as_of,
+                              freq = "months")
+  capm_res <- clean_asset_bench_rf(x[, 1], x[, 4], x[, 3], date_end = as_of,
+                                   freq = "months")
+  pres <- imb_alt_slide(pres, res, dict, descr, loc$alt,
+                        "Magnitude Capital",
+                        "Magnitude Capital", as_of, capm_res,
+                        alloc_bar = TRUE)
 
   print(pres, "~/imb.pptx")
 }
