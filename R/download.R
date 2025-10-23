@@ -1018,11 +1018,73 @@ read_sell_wb <- function(wb, idx_nm) {
 
 # Factset weights -----
 
-fs_model_wgt <- function(fldr) {
+fs_model_wgt <- function(fdir) {
+  equity <- fs_wgt_flatten_xl(paste0(fdir, "Equity.xlsx"))
+  fixed <- fs_wgt_flatten_xl(paste0(fdir, "Fixed Income.xlsx"))
+  div <- fs_wgt_flatten_xl(paste0(fdir, "Diversifiers.xlsx"))
+  mod <- fs_wgt_flatten_xl(paste0(fdir, "Model.xlsx"))
 
+  equity <- fill_rebal_dates(equity, as.Date("2016-11-30"),
+                             as.Date("2025-09-30"), "M")
+  fixed <- fill_rebal_dates(fixed, as.Date("2016-11-30"),
+                            as.Date("2025-09-30"), "M")
+  div <- fill_rebal_dates(div, as.Date("2016-11-30"),
+                          as.Date("2025-09-30"), "M")
+  mod <- fill_rebal_dates(mod, as.Date("2016-11-30"),
+                          as.Date("2025-09-30"), "M")
+
+  equity_mult <- mod[, grepl("EQUITY", colnames(mod))]
+  equity_mult <- matrix(equity_mult, nrow = nrow(equity), ncol = ncol(equity))
+  equity <- equity * equity_mult
+
+  fixed_mult <- mod[, grepl("FIXED_INCOME", colnames(mod))]
+  fixed_mult <- matrix(fixed_mult, nrow = nrow(fixed), ncol = ncol(fixed))
+  fixed <- fixed * fixed_mult
+
+  div_mult <- mod[, grepl("DIVERSIFIERS", colnames(mod))]
+  div_mult <- matrix(div_mult, nrow = nrow(div), ncol = ncol(div))
+  div <- div * div_mult
+
+  a <- xts_cbind(equity, fixed)
+  xts_cbind(a, div)
 }
 
-fs_wgt_flatten_xl <- function(xl) {
+fill_rebal_dates <- function(rebal_wgt, start_date, date_end, rebal_freq) {
+  if (rebal_freq == 'M') {
+    dt_vec <- seq(start_date, date_end, 'months')
+    dt_vec <- lubridate::floor_date(dt_vec + 10, 'months') - 1
+  } else if (rebal_freq == 'Q') {
+    dt_vec <- seq(start_date, date_end, 'quarters')
+    dt_vec <- lubridate::floor_date(dt_vec + 10, 'quarters') - 1
+  } else if (rebal_freq == 'A') {
+    dt_vec <- seq(start_date, date_end, 'years')
+  } else if (rebal_freq == "BH") {
+    rebal_wgt
+  } else {
+    stop("rebal_wgt miss-specified")
+  }
+  # create a NA xts of dates, combine with rebalance dates, and fill missing
+  # values based on last valid rebalance weight
+  dt_mat <- matrix(as.numeric(NA), nrow = length(dt_vec),
+                   ncol = ncol(rebal_wgt))
+  dt_xts <- xts(dt_mat, dt_vec)
+  # remove any potential duplicate dates if existing rebalance on
+  # period end
+  colnames(dt_xts) <- colnames(rebal_wgt)
+  is_dup <- zoo::index(dt_xts) %in% zoo::index(rebal_wgt)
+  rebal_combo <- rbind(dt_xts[!is_dup, ], rebal_wgt)
+  # first date can be missing, e.g., monthly rebalance created from vector
+  # rebal weights
+  if (all(is.na(rebal_combo[1, ]))) {
+    rebal_combo[1, ] <- rebal_wgt[1, ]
+  }
+  rebal_xts <- fill_na_price(rebal_combo)
+  colnames(rebal_xts) <- colnames(rebal_wgt)
+  return(rebal_xts)
+}
+
+
+fs_wgt_flatten_xl <- function(xl, eom = TRUE) {
   dat <- readxl::read_excel(xl)
   dt <- colnames(dat)[4:ncol(dat)]
   dt <- gsub("EARLIEST to ", "", dt)
@@ -1036,60 +1098,10 @@ fs_wgt_flatten_xl <- function(xl) {
   wgt_xts <- xts(wgt_mat, dt)
   wgt_xts <- wgt_xts / 100
   colnames(wgt_xts) <- dat[[1]][3:nrow(dat)]
+  if (eom) {
+    zoo::index(wgt_xts) <- eo_month(zoo::index(wgt_xts))
+  }
   return(wgt_xts)
 }
 
 
-
-
-
-
-
-
-
-fs_wgt_clean_reb_wgt <- function(factset_download_xl, dict_xl, date_end,
-                          ret_col = c('Asset Return', 'Manager Return')) {
-
-  ret_col <- ret_col[1]
-  left_join_df <- merge(factset_download_xl, dict_xl, by = 'Component',
-                        sort = FALSE)
-  col_names <- left_join_df[, ret_col]
-  dt_vec <- fs_wgt_clean_date(
-    colnames(factset_download_xl)[4:ncol(factset_download_xl)])
-  dt_vec <- lubridate::ceiling_date(dt_vec, 'months') - 1
-  wgt_mat_t <- as.matrix(factset_download_xl[, 4:ncol(factset_download_xl)])
-  wgt_mat <- t(wgt_mat_t)
-  wgt_mat_num <- apply(wgt_mat, 2, as.numeric) / 100
-  if (is.na(sum(wgt_mat_num[1, ]))) {
-    wgt_mat_num[1, ] <- wgt_mat_num[2, ]
-  }
-
-  date_start <- dt_vec[1]
-  reb_dt <- lubridate::ceiling_date(
-    seq.Date(date_start, date_end + 5, 'months') - 10, 'months') - 1
-  reb_mat <- matrix(nrow = length(reb_dt), ncol = ncol(wgt_mat_num))
-  ix <- dt_vec <= date_end
-  dt_vec <- dt_vec[ix]
-  wgt_mat_num <- wgt_mat_num[ix, ]
-  match_dt <- match(dt_vec, reb_dt)
-  reb_mat[match_dt, ] <- wgt_mat_num
-
-  j <- 2
-  for (i in 2:nrow(reb_mat)) {
-    # no more rebalance dates, roll last date forward
-    if (j > length(match_dt)) {
-      reb_mat[i, ] <- reb_mat[i - 1, ]
-      next
-    }
-    if (i != match_dt[j]) {
-      reb_mat[i, ] <- reb_mat[i - 1, ]
-    } else {
-      j <- j + 1
-    }
-  }
-
-  reb_xts <- xts(reb_mat, reb_dt)
-  reb_xts[is.na(reb_xts)] <- 0
-  colnames(reb_xts) <- col_names
-  return(reb_xts)
-}
